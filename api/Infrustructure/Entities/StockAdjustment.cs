@@ -1,23 +1,14 @@
-using System;
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using Infrustructure.Common;
 
-namespace IntegratedInfrustructure.Models
+namespace Infrustructure.Entities
 {
-    [Table("StockAdjustments")]
-
-    public class StockAdjustmentss
+    public class StockAdjustment : BaseEntity
     {
-        [Key]
-        public int Id { get; set; }
-       public  int MedBatchId { get; set; }
-         public string QuantityChanged { get; set; }
-         public int Reason { get; set; }
-         public int AdjustmentType { get; set; }
-        public int CreatedById { get; set; }
-        public DateTime CreatedDate { get; set; }
+        public int MedicineBatchId { get; set; }
+        public MedicineBatch MedicineBatch { get; set; } = null!;
+
+        public int QuantityChange { get; set; } // + or -
+
+        public string Reason { get; set; } = null!;
     }
-    
-    
-    
 }

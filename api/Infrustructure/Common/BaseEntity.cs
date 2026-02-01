@@ -1,4 +1,4 @@
-namespace Pharmacy.Domain.Common
+namespace Infrustructure.Common
 {
     public abstract class BaseEntity
     {
