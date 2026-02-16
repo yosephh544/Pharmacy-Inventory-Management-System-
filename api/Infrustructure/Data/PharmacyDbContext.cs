@@ -1,5 +1,6 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using Pharmacy.Domain.Entities;
+using Infrustructure.Entities;
 
 namespace Pharmacy.Infrastructure.Data
 {
@@ -14,6 +15,7 @@ namespace Pharmacy.Infrastructure.Data
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<UserRole> UserRoles => Set<UserRole>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         // 💊 MEDICINE & INVENTORY
         public DbSet<Medicine> Medicines => Set<Medicine>();
@@ -74,7 +76,7 @@ namespace Pharmacy.Infrastructure.Data
 
             modelBuilder.Entity<MedicineBatch>()
                 .HasOne(x => x.Supplier)
-                .WithMany()
+                .WithMany(s => s.Batches)
                 .HasForeignKey(x => x.SupplierId);
 
             // Purchase
@@ -95,9 +97,9 @@ namespace Pharmacy.Infrastructure.Data
                 .HasForeignKey(x => x.SaleId);
 
             modelBuilder.Entity<SaleItem>()
-                .HasOne(x => x.Batch)
+                .HasOne(x => x.MedicineBatch)
                 .WithMany()
-                .HasForeignKey(x => x.BatchId);
+                .HasForeignKey(x => x.MedicineBatchId);
 
             // Decimal precision
             modelBuilder.Entity<MedicineBatch>()
@@ -119,15 +121,23 @@ namespace Pharmacy.Infrastructure.Data
 
         private static void ApplySoftDeleteFilter(ModelBuilder modelBuilder)
         {
+            var baseType = typeof(Infrustructure.Common.BaseEntity);
+
             foreach (var entityType in modelBuilder.Model.GetEntityTypes())
             {
-                if (typeof(Pharmacy.Domain.Common.BaseEntity)
-                    .IsAssignableFrom(entityType.ClrType))
+                if (baseType.IsAssignableFrom(entityType.ClrType))
                 {
-                    modelBuilder.Entity(entityType.ClrType)
-                        .HasQueryFilter(
-                            EF.Property<bool>(EF.Property<object>(null!, "Entity"), "IsDeleted") == false
-                        );
+                    // build: e => EF.Property<bool>(e, "IsDeleted") == false
+                    var parameter = Expression.Parameter(entityType.ClrType, "e");
+
+                    var efPropertyMethod = typeof(EF).GetMethod(nameof(EF.Property))?.MakeGenericMethod(typeof(bool));
+                    var isDeletedProperty = Expression.Call(efPropertyMethod!, parameter, Expression.Constant("IsDeleted"));
+
+                    var condition = Expression.Equal(isDeletedProperty, Expression.Constant(false));
+
+                    var lambda = Expression.Lambda(condition, parameter);
+
+                    modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
                 }
             }
         }

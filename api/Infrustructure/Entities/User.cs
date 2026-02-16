@@ -12,5 +12,6 @@ namespace Infrustructure.Entities
         public PharmacyProfile PharmacyProfile { get; set; } = null!;
 
         public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+        public bool IsActive { get; set; } = true;
     }
 }

@@ -8,9 +8,23 @@ namespace Infrustructure.Entities
         [Required, MaxLength(150)]
         public string Name { get; set; } = null!;
 
-        public string? Code { get; set; }
+        [Required, MaxLength(50)]
+        public string Code { get; set; } = null!;
 
-        public decimal UnitPrice { get; set; }
+        [MaxLength(150)]
+        public string? GenericName { get; set; }
+
+        [MaxLength(50)]
+        public string? Strength { get; set; }
+
+        [MaxLength(150)]
+        public string? Manufacturer { get; set; }
+
+        public int ReorderLevel { get; set; }
+        public bool RequiresPrescription { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public decimal? UnitPrice { get; set; }
 
         public int CategoryId { get; set; }
         public MedicineCategory Category { get; set; } = null!;

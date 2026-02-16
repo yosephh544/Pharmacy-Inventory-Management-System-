@@ -1,3 +1,5 @@
+// ...existing code...
+using System;
 using Infrustructure.Common;
 
 namespace Infrustructure.Entities
@@ -12,5 +14,14 @@ namespace Infrustructure.Entities
 
         public int Quantity { get; set; }
         public decimal PurchasePrice { get; set; }
+        public decimal SellingPrice { get; set; }
+
+        public DateTime ReceivedDate { get; set; }
+
+        public int SupplierId { get; set; }
+        public Supplier? Supplier { get; set; }
+
+        public bool IsActive { get; set; }
     }
 }
+// ...existing code...
