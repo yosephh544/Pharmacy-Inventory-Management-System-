@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaPills, FaHome, FaBox, FaCapsules, FaShoppingCart, FaTruck, FaFileAlt, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { FaPills, FaHome, FaBox, FaCapsules, FaShoppingCart, FaTruck, FaFileAlt, FaChevronDown, FaChevronRight, FaUserCog } from 'react-icons/fa';
 
 const Sidebar = () => {
     const [reportsExpanded, setReportsExpanded] = useState(false);
+
+    // TODO: Replace with actual user role from authentication context
+    const userRole = 'admin'; // Hardcoded for now - will be replaced with actual auth
+    const isAdmin = userRole === 'admin';
 
     const toggleReports = () => {
         setReportsExpanded(!reportsExpanded);
@@ -56,6 +60,17 @@ const Sidebar = () => {
                     <FaTruck className="sidebar-icon" />
                     <span>Purchases</span>
                 </NavLink>
+
+                {/* Admin Only - System Users */}
+                {isAdmin && (
+                    <NavLink
+                        to="/system-users"
+                        className={({ isActive }) => `sidebar-menu-item ${isActive ? 'active' : ''}`}
+                    >
+                        <FaUserCog className="sidebar-icon" />
+                        <span>System Users</span>
+                    </NavLink>
+                )}
 
                 {/* Reports with Submenu */}
                 <div className="sidebar-menu-section">
