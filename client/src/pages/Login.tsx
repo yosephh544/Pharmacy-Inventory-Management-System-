@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Container, Form, Button, Card, Spinner } from 'react-bootstrap';
 import { FaPills } from 'react-icons/fa';
 import { useForm } from 'react-hook-form';
@@ -8,16 +8,29 @@ import { authService } from '../services/authService';
 import type { LoginRequestDto } from '../types/auth'; // Adjust path if needed
 
 const Login = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginRequestDto>();
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<LoginRequestDto>({
+    defaultValues: {
+      username: '',
+      password: ''
+    }
+  });
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+
+  // Aggressively clear fields on mount to bypass browser autofill
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      reset({ username: '', password: '' });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [reset]);
 
   const onSubmit = async (data: LoginRequestDto) => {
     setLoading(true);
     try {
       await authService.login(data);
       toast.success('Login Successful!');
-      navigate('/'); // Navigate to dashboard
+      navigate('/dashboard'); // Navigate to dashboard
     } catch (error: any) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -39,10 +52,16 @@ const Login = () => {
           <p className="text-muted mb-4 small">Enter your email below to login to your account</p>
 
           <Form onSubmit={handleSubmit(onSubmit)} className="text-start">
+            {/* Dummy fields to trick browser autofill */}
+            <input type="text" name="fakeusernameremembered" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+            <input type="password" name="fakepasswordremembered" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+
             <Form.Group className="mb-3" controlId="formBasicEmail">
               <Form.Label className="fw-bold small">Username</Form.Label>
               <Form.Control
                 type="text"
+                autoComplete="off"
+                placeholder=""
                 className={`bg-lighter ${errors.username ? 'is-invalid' : ''}`}
                 {...register("username", { required: "Username is required" })}
               />
@@ -53,6 +72,8 @@ const Login = () => {
               <Form.Label className="fw-bold small">Password</Form.Label>
               <Form.Control
                 type="password"
+                autoComplete="new-password"
+                placeholder=""
                 className={`bg-lighter ${errors.password ? 'is-invalid' : ''}`}
                 {...register("password", { required: "Password is required" })}
               />

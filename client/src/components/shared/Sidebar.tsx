@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { FaPills, FaHome, FaBox, FaCapsules, FaShoppingCart, FaTruck, FaFileAlt, FaChevronDown, FaChevronRight, FaUserCog } from 'react-icons/fa';
+import { FaHome, FaBox, FaCapsules, FaShoppingCart, FaTruck, FaFileAlt, FaChevronDown, FaChevronRight, FaUserCog } from 'react-icons/fa';
 
 const Sidebar = () => {
     const [reportsExpanded, setReportsExpanded] = useState(false);
@@ -21,7 +21,7 @@ const Sidebar = () => {
             {/* Sidebar Menu */}
             <nav className="sidebar-nav">
                 <NavLink
-                    to="/"
+                    to="/dashboard"
                     className={({ isActive }) => `sidebar-menu-item ${isActive ? 'active' : ''}`}
                     end
                 >
