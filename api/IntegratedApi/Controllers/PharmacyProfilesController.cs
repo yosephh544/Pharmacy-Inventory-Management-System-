@@ -19,7 +19,7 @@ namespace IntegratedApi.Controllers
         }
 
         // GET: api/pharmacies
-        [HttpGet("GetPharmacies")]
+        [HttpGet]
         public async Task<IActionResult> GetPharmacies()
         {
             try
