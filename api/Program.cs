@@ -1,14 +1,46 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Infrustructure.Entities;
 using Pharmacy.Infrastructure.Data;
 using IntegratedImplementation.Interfaces;
 using IntegratedImplementation.Services;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+// JWT Authentication Configuration
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "super_secret_key_which_is_at_least_32_characters_long";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "pharmacy";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "pharmacy_clients";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.Name
+    };
+});
+
 builder.Services.AddAuthorization();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCors(options =>
@@ -20,16 +52,65 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
+
+builder.Services.AddDbContext<PharmacyDbContext>(options =>
+{
+    options
+        .UseSqlServer(
+            builder.Configuration.GetConnectionString("DefaultConnection"),
+            sqlOptions => sqlOptions.MaxBatchSize(1))
+        // Log parameter values + generated SQL so we can see the exact failing statement
+        .EnableSensitiveDataLogging()
+        .LogTo(
+            Console.WriteLine,
+            new[]
+            {
+                DbLoggerCategory.Database.Command.Name,
+                DbLoggerCategory.Update.Name
+            },
+            LogLevel.Information);
+});
+
+
 builder.Services.AddSwaggerGen(c =>
 {
 	c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo { Title = "Pharmacy Inventory API", Version = "v1" });
+    
+    // JWT Authorization in Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                },
+                Scheme = "oauth2",
+                Name = "Bearer",
+                In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+            },
+            new List<string>()
+        }
+    });
 });
 
-builder.Services.AddDbContext<PharmacyDbContext>(opts =>
-	opts.UseInMemoryDatabase("PharmacyDev"));
-
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+
+
 
 var app = builder.Build();
 
@@ -46,6 +127,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("AllowAll");
+
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapControllers();
 
 app.MapGet("/", () => "Hello World!");
@@ -69,24 +154,63 @@ using (var scope = app.Services.CreateScope())
 		db.SaveChanges();
 	}
 
-	if (!db.Users.Any(u => u.Username == "admin"))
+	// Seed default roles
+	if (!db.Roles.Any())
 	{
-		var profile = db.Set<Infrustructure.Entities.PharmacyProfile>().First();
-		var user = new User
+		var roles = new[]
+		{
+			new Role { Name = "Admin", CreatedAt = DateTime.UtcNow },
+			new Role { Name = "Pharmacist", CreatedAt = DateTime.UtcNow },
+			new Role { Name = "Cashier", CreatedAt = DateTime.UtcNow },
+			new Role { Name = "Viewer", CreatedAt = DateTime.UtcNow }
+		};
+		db.Roles.AddRange(roles);
+		db.SaveChanges();
+		Console.WriteLine("DevSeed: Created default roles (Admin, Pharmacist, Cashier, Viewer)");
+	}
+
+	var adminUser = db.Users.FirstOrDefault(u => u.Username == "admin");
+	if (adminUser == null)
+	{
+		var profile = db.Set<Infrustructure.Entities.PharmacyProfile>().FirstOrDefault() 
+            ?? new Infrustructure.Entities.PharmacyProfile { Name = "Default", Code = "DEF", Address = "Local", Phone = "000" };
+        
+        if (profile.Id == 0) {
+            db.Set<Infrustructure.Entities.PharmacyProfile>().Add(profile);
+            db.SaveChanges();
+        }
+
+		adminUser = new User
 		{
 			Username = "admin",
 			FullName = "Admin User",
 			PharmacyProfileId = profile.Id,
 			IsActive = true
 		};
-		// Hash the dev password "123" and persist
-		user.PasswordHash = hasher.HashPassword(user, "123");
-		db.Users.Add(user);
+		adminUser.PasswordHash = hasher.HashPassword(adminUser, "123");
+		db.Users.Add(adminUser);
 		db.SaveChanges();
+		Console.WriteLine("DevSeed: Created admin user");
+	}
 
-		// Print the generated hash to the console for developer visibility
-		Console.WriteLine($"DevSeed: admin password hash={user.PasswordHash}");
+	var adminRole = db.Roles.FirstOrDefault(r => r.Name == "Admin");
+    if (adminRole == null) {
+        adminRole = new Role { Name = "Admin", CreatedAt = DateTime.UtcNow };
+        db.Roles.Add(adminRole);
+        db.SaveChanges();
+    }
+
+	if (!db.UserRoles.Any(ur => ur.UserId == adminUser.Id && ur.RoleId == adminRole.Id))
+	{
+		db.UserRoles.Add(new Infrustructure.Entities.UserRole
+		{
+			UserId = adminUser.Id,
+			RoleId = adminRole.Id
+		});
+		db.SaveChanges();
+		Console.WriteLine("DevSeed: Assigned Admin role to admin user");
 	}
 }
+
 
 app.Run();

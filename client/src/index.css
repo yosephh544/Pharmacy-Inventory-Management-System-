@@ -85,23 +85,20 @@ button:focus-visible {
 }
 
 .login-card {
-  width: 190%;
-  max-width: 400px;
-  /* Default for mobile */
+  width: 100%;
+  max-width: 360px; /* Default for mobile / small screens */
   border-radius: 15px;
 }
 
 @media (min-width: 768px) {
   .login-card {
-    max-width: 600px;
-    /* Tablet */
+    max-width: 420px; /* Tablet */
   }
 }
 
 @media (min-width: 1024px) {
   .login-card {
-    max-width: 900px;
-    /* Desktop - Increased size as requested */
+    max-width: 460px; /* Desktop - narrower card */
   }
 }
 

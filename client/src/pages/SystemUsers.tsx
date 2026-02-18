@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Container, Card, Row, Col, Button, Table, Badge, Spinner, Alert } from 'react-bootstrap';
+import { Container, Card, Row, Col, Button, Table, Badge, Spinner, Alert, Modal, Form } from 'react-bootstrap';
 import { FaUserPlus, FaUserShield } from 'react-icons/fa';
 import api from '../services/api';
 
@@ -17,23 +17,39 @@ interface SystemRole {
     userCount: number;
 }
 
+interface PharmacyProfile {
+    id: number;
+    name: string;
+    code: string;
+}
+
 const SystemUsers = () => {
     const [users, setUsers] = useState<SystemUser[]>([]);
     const [roles, setRoles] = useState<SystemRole[]>([]);
+    const [pharmacies, setPharmacies] = useState<PharmacyProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionMessage, setActionMessage] = useState<string | null>(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [newFullName, setNewFullName] = useState('');
+    const [newUsername, setNewUsername] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [newRoleIds, setNewRoleIds] = useState<number[]>([]);
+    const [newPharmacyProfileId, setNewPharmacyProfileId] = useState<number>(0);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
         setError(null);
         try {
-            const [usersRes, rolesRes] = await Promise.all([
+            const [usersRes, rolesRes, pharmaciesRes] = await Promise.all([
                 api.get<SystemUser[]>('/users/GetUsers'),
                 api.get<SystemRole[]>('/roles/GetRoles'),
+                api.get<PharmacyProfile[]>('/pharmacies'),
             ]);
             setUsers(usersRes.data);
             setRoles(rolesRes.data);
+            setPharmacies(pharmaciesRes.data);
         } catch (err: any) {
             const message =
                 err?.response?.data?.message ||
@@ -49,18 +65,85 @@ const SystemUsers = () => {
         loadData();
     }, []);
 
-    const handleDisableUser = async (userId: number) => {
+    const handleOpenCreateModal = () => {
         setError(null);
         setActionMessage(null);
+        setNewFullName('');
+        setNewUsername('');
+        setNewPassword('');
+        setNewRoleIds([]);
+        setSubmitAttempted(false);
+        // Default to first pharmacy if available
+        setNewPharmacyProfileId(pharmacies.length > 0 ? pharmacies[0].id : 0);
+        setShowCreateModal(true);
+    };
+
+    const handleToggleRoleSelection = (roleId: number) => {
+        setNewRoleIds(prev =>
+            prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+        );
+    };
+
+    const handleCreateUser = async () => {
+        setError(null);
+        setActionMessage(null);
+        setSubmitAttempted(true);
+
+        const fullNameError = !newFullName.trim();
+        const usernameError = !newUsername.trim();
+        const passwordError = !newPassword.trim();
+        const rolesError = newRoleIds.length === 0;
+        const pharmacyError = !newPharmacyProfileId || newPharmacyProfileId <= 0;
+
+        if (fullNameError || usernameError || passwordError || rolesError || pharmacyError) {
+            setError('Please fill all required fields before creating a user.');
+            return;
+        }
+
         try {
-            await api.delete(`/users/DeleteUser/${userId}`);
-            setActionMessage(`User with ID ${userId} was deactivated successfully.`);
+            await api.post('/users/CreateUser', {
+                fullName: newFullName.trim(),
+                username: newUsername.trim(),
+                password: newPassword,
+                pharmacyProfileId: newPharmacyProfileId,
+                roleIds: newRoleIds,
+            });
+
+            setShowCreateModal(false);
+            setActionMessage(`User "${newUsername}" was created successfully.`);
             await loadData();
         } catch (err: any) {
             const message =
                 err?.response?.data?.message ||
                 err?.message ||
-                'Failed to deactivate user.';
+                'Failed to create user.';
+            setError(message);
+        }
+    };
+
+    const handleToggleUserStatus = async (user: SystemUser) => {
+        setError(null);
+        setActionMessage(null);
+
+        try {
+            if (user.isActive) {
+                // Deactivate (soft delete)
+                await api.delete(`/users/DeleteUser/${user.id}`);
+                setActionMessage(`User with ID ${user.id} was deactivated successfully.`);
+            } else {
+                // Reactivate using UpdateUser API
+                await api.put(`/users/UpdateUser/${user.id}`, {
+                    isActive: true,
+                });
+                setActionMessage(`User with ID ${user.id} was reactivated successfully.`);
+            }
+
+            await loadData();
+        } catch (err: any) {
+            const message =
+                err?.response?.data?.message ||
+                err?.message ||
+                (user.isActive ? 'Failed to deactivate user.' : 'Failed to reactivate user.');
             setError(message);
         }
     };
@@ -77,8 +160,7 @@ const SystemUsers = () => {
                 <Button
                     variant="primary"
                     className="d-flex align-items-center gap-2"
-                    disabled
-                    title="User creation UI coming soon"
+                    onClick={handleOpenCreateModal}
                 >
                     <FaUserPlus /> Add New User
                 </Button>
@@ -158,12 +240,11 @@ const SystemUsers = () => {
                                             </td>
                                             <td>
                                                 <Button
-                                                    variant="outline-danger"
+                                                    variant={user.isActive ? 'outline-danger' : 'outline-success'}
                                                     size="sm"
-                                                    disabled={!user.isActive}
-                                                    onClick={() => handleDisableUser(user.id)}
+                                                    onClick={() => handleToggleUserStatus(user)}
                                                 >
-                                                    Disable
+                                                    {user.isActive ? 'Disable' : 'Enable'}
                                                 </Button>
                                             </td>
                                         </tr>
@@ -228,6 +309,108 @@ const SystemUsers = () => {
                     </Card>
                 </Col>
             </Row>
+
+            <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Add New User</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Full Name</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={newFullName}
+                                onChange={e => setNewFullName(e.target.value)}
+                                isInvalid={submitAttempted && !newFullName.trim()}
+                                placeholder="Enter full name"
+                            />
+                            <Form.Control.Feedback type="invalid">
+                                Full name is required.
+                            </Form.Control.Feedback>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Username</Form.Label>
+                            <Form.Control
+                                type="text"
+                                value={newUsername}
+                                onChange={e => setNewUsername(e.target.value)}
+                                isInvalid={submitAttempted && !newUsername.trim()}
+                                placeholder="Enter username"
+                            />
+                            <Form.Control.Feedback type="invalid">
+                                Username is required.
+                            </Form.Control.Feedback>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Password</Form.Label>
+                            <Form.Control
+                                type="password"
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                isInvalid={submitAttempted && !newPassword.trim()}
+                                placeholder="Enter temporary password"
+                            />
+                            <Form.Control.Feedback type="invalid">
+                                Password is required.
+                            </Form.Control.Feedback>
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Pharmacy</Form.Label>
+                            <Form.Select
+                                value={newPharmacyProfileId}
+                                onChange={e => setNewPharmacyProfileId(Number(e.target.value))}
+                                disabled={pharmacies.length === 0}
+                                isInvalid={submitAttempted && (!newPharmacyProfileId || newPharmacyProfileId <= 0)}
+                            >
+                                {pharmacies.length === 0 && (
+                                    <option value={0}>No pharmacies available</option>
+                                )}
+                                {pharmacies.map(pharmacy => (
+                                    <option key={pharmacy.id} value={pharmacy.id}>
+                                        {pharmacy.name} ({pharmacy.code})
+                                    </option>
+                                ))}
+                            </Form.Select>
+                            <Form.Control.Feedback type="invalid">
+                                Please select a pharmacy profile.
+                            </Form.Control.Feedback>
+                        </Form.Group>
+                        <Form.Group className="mb-2">
+                            <Form.Label>Roles</Form.Label>
+                            <div>
+                                {roles.map(role => (
+                                    <Form.Check
+                                        key={role.id}
+                                        inline
+                                        type="checkbox"
+                                        id={`new-user-role-${role.id}`}
+                                        label={role.name}
+                                        checked={newRoleIds.includes(role.id)}
+                                        onChange={() => handleToggleRoleSelection(role.id)}
+                                    />
+                                ))}
+                            </div>
+                            {submitAttempted && newRoleIds.length === 0 && (
+                                <div className="text-danger small mt-1">
+                                    Please select at least one role.
+                                </div>
+                            )}
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="primary"
+                        onClick={handleCreateUser}
+                    >
+                        Create User
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 };

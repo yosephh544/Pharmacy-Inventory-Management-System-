@@ -22,10 +22,9 @@ namespace IntegratedImplementation.Services
 
         public async Task<IEnumerable<UserListItemDto>> GetAllUsersAsync()
         {
-            // Only return active users so "deleted" users (IsActive = false)
-            // don't show up in the list.
+            // Return all users (active + inactive) so the UI
+            // can show their current status and optionally re-activate them.
             var users = await _context.Users
-                .Where(u => u.IsActive)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .ToListAsync();
