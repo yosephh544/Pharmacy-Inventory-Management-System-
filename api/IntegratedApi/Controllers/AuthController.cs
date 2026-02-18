@@ -35,39 +35,5 @@ namespace IntegratedApi.Controllers
                 return Problem(detail: ex.Message);
             }
         }
-
-        [HttpPost("refresh-token")]
-        [AllowAnonymous]
-        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto model)
-        {
-            try
-            {
-                var result = await _authService.RefreshTokenAsync(model.RefreshToken);
-                return Ok(result);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message);
-            }
-        }
-
-        [HttpPost("logout")]
-        [Authorize]
-        public async Task<IActionResult> Logout([FromBody] RefreshTokenRequestDto model)
-        {
-            try
-            {
-                await _authService.LogoutAsync(model.RefreshToken);
-                return NoContent();
-            }
-            catch (Exception ex)
-            {
-                return Problem(detail: ex.Message);
-            }
-        }
     }
 }

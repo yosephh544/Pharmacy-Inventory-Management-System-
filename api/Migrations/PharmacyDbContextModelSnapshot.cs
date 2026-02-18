@@ -63,7 +63,7 @@ namespace Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Medicine", b =>
@@ -132,7 +132,7 @@ namespace Api.Migrations
 
                     b.HasIndex("MedicineCategoryId");
 
-                    b.ToTable("Medicines");
+                    b.ToTable("Medicines", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.MedicineBatch", b =>
@@ -188,7 +188,7 @@ namespace Api.Migrations
 
                     b.HasIndex("SupplierId");
 
-                    b.ToTable("MedicineBatches");
+                    b.ToTable("MedicineBatches", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.MedicineCategory", b =>
@@ -215,7 +215,7 @@ namespace Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MedicineCategories");
+                    b.ToTable("MedicineCategories", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Notification", b =>
@@ -253,7 +253,7 @@ namespace Api.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications");
+                    b.ToTable("Notifications", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.PharmacyProfile", b =>
@@ -300,7 +300,7 @@ namespace Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("PharmacyProfile");
+                    b.ToTable("PharmacyProfile", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Purchase", b =>
@@ -341,7 +341,7 @@ namespace Api.Migrations
 
                     b.HasIndex("SupplierId");
 
-                    b.ToTable("Purchases");
+                    b.ToTable("Purchases", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.PurchaseItem", b =>
@@ -392,7 +392,7 @@ namespace Api.Migrations
 
                     b.HasIndex("PurchaseId");
 
-                    b.ToTable("PurchaseItems");
+                    b.ToTable("PurchaseItems", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Role", b =>
@@ -418,7 +418,7 @@ namespace Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Roles");
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Sale", b =>
@@ -462,7 +462,7 @@ namespace Api.Migrations
 
                     b.HasIndex("SoldByUserId");
 
-                    b.ToTable("Sales");
+                    b.ToTable("Sales", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.SaleItem", b =>
@@ -501,7 +501,7 @@ namespace Api.Migrations
 
                     b.HasIndex("SaleId");
 
-                    b.ToTable("SaleItems");
+                    b.ToTable("SaleItems", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.StockAdjustment", b =>
@@ -535,7 +535,7 @@ namespace Api.Migrations
 
                     b.HasIndex("MedicineBatchId");
 
-                    b.ToTable("StockAdjustments");
+                    b.ToTable("StockAdjustments", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.Supplier", b =>
@@ -574,7 +574,7 @@ namespace Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Suppliers");
+                    b.ToTable("Suppliers", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.User", b =>
@@ -616,7 +616,7 @@ namespace Api.Migrations
 
                     b.HasIndex("PharmacyProfileId");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.UserRole", b =>
@@ -631,7 +631,7 @@ namespace Api.Migrations
 
                     b.HasIndex("RoleId");
 
-                    b.ToTable("UserRoles");
+                    b.ToTable("UserRoles", (string)null);
                 });
 
             modelBuilder.Entity("Infrustructure.Entities.AuditLog", b =>

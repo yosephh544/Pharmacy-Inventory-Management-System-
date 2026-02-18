@@ -15,7 +15,6 @@ namespace Pharmacy.Infrastructure.Data
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<UserRole> UserRoles => Set<UserRole>();
-        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
         // 💊 MEDICINE & INVENTORY
         public DbSet<Medicine> Medicines => Set<Medicine>();
@@ -40,12 +39,17 @@ namespace Pharmacy.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Apply global soft delete filter
-            ApplySoftDeleteFilter(modelBuilder);
-
             // Composite keys
-            modelBuilder.Entity<UserRole>()
-                .HasKey(x => new { x.UserId, x.RoleId });
+            modelBuilder.Entity<UserRole>(entity =>
+            {
+                entity.HasKey(x => new { x.UserId, x.RoleId });
+                entity.ToTable(tb => tb.UseSqlOutputClause(false));
+            });
+
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.ToTable(tb => tb.UseSqlOutputClause(false));
+            });
 
             // User ↔ Role
             modelBuilder.Entity<UserRole>()
@@ -117,29 +121,6 @@ namespace Pharmacy.Infrastructure.Data
             modelBuilder.Entity<PurchaseItem>()
                 .Property(x => x.UnitPrice)
                 .HasPrecision(18, 2);
-        }
-
-        private static void ApplySoftDeleteFilter(ModelBuilder modelBuilder)
-        {
-            var baseType = typeof(Infrustructure.Common.BaseEntity);
-
-            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
-            {
-                if (baseType.IsAssignableFrom(entityType.ClrType))
-                {
-                    // build: e => EF.Property<bool>(e, "IsDeleted") == false
-                    var parameter = Expression.Parameter(entityType.ClrType, "e");
-
-                    var efPropertyMethod = typeof(EF).GetMethod(nameof(EF.Property))?.MakeGenericMethod(typeof(bool));
-                    var isDeletedProperty = Expression.Call(efPropertyMethod!, parameter, Expression.Constant("IsDeleted"));
-
-                    var condition = Expression.Equal(isDeletedProperty, Expression.Constant(false));
-
-                    var lambda = Expression.Lambda(condition, parameter);
-
-                    modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
-                }
-            }
         }
     }
 }

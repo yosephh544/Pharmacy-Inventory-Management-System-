@@ -11,7 +11,6 @@ namespace Infrustructure.Entities
         public DateTime PurchaseDate { get; set; }
         public decimal TotalAmount { get; set; }
 
-        public int? CreatedBy { get; set; }
         public User? CreatedByUser { get; set; }
 
         public ICollection<PurchaseItem> Items { get; set; } = new List<PurchaseItem>();

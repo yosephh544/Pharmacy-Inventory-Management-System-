@@ -38,7 +38,7 @@ namespace IntegratedImplementation.Services
                     .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Username == dto.Username);
 
-            if (user == null)
+            if (user == null || !user.IsActive)
                 throw new UnauthorizedAccessException("Invalid credentials");
 
             var passwordResult = _passwordHasher.VerifyHashedPassword(
@@ -50,76 +50,12 @@ namespace IntegratedImplementation.Services
                 throw new UnauthorizedAccessException("Invalid credentials");
 
             var accessToken = GenerateAccessToken(user);
-            var refreshToken = GenerateRefreshToken();
-
-            var refreshTokenEntity = new RefreshToken
-            {
-                UserId = user.Id,
-                Token = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                IsRevoked = false
-            };
-
-            _context.RefreshTokens.Add(refreshTokenEntity);
-            await _context.SaveChangesAsync();
 
             return new AuthResponseDto
             {
                 AccessToken = accessToken,
-                RefreshToken = refreshToken,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(30)
             };
-        }
-
-        public async Task<AuthResponseDto> RefreshTokenAsync(string refreshToken)
-        {
-            var storedToken = await _context.RefreshTokens
-                .Include(rt => rt.User)
-                    .ThenInclude(u => u.UserRoles)
-                        .ThenInclude(ur => ur.Role)
-                .FirstOrDefaultAsync(rt =>
-                    rt.Token == refreshToken &&
-                    !rt.IsRevoked &&
-                    rt.ExpiresAt > DateTime.UtcNow);
-
-            if (storedToken == null)
-                throw new UnauthorizedAccessException("Invalid refresh token");
-
-            // Rotate refresh token
-            storedToken.IsRevoked = true;
-
-            var newRefreshToken = GenerateRefreshToken();
-
-            _context.RefreshTokens.Add(new RefreshToken
-            {
-                UserId = storedToken.UserId,
-                Token = newRefreshToken,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                IsRevoked = false
-            });
-
-            var newAccessToken = GenerateAccessToken(storedToken.User!);
-
-            await _context.SaveChangesAsync();
-
-            return new AuthResponseDto
-            {
-                AccessToken = newAccessToken,
-                RefreshToken = newRefreshToken,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(30)
-            };
-        }
-
-        public async Task LogoutAsync(string refreshToken)
-        {
-            var token = await _context.RefreshTokens
-                .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
-
-            if (token == null)
-                return;
-
-            token.IsRevoked = true;
-            await _context.SaveChangesAsync();
         }
 
         private string GenerateAccessToken(User user)
@@ -131,12 +67,12 @@ namespace IntegratedImplementation.Services
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.Username),
                 new Claim("fullName", user.FullName ?? string.Empty)
-            }.ToList();
+            };
 
             if (user.UserRoles != null)
             {
