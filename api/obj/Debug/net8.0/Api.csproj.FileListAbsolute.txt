@@ -145,3 +145,4 @@ C:\Users\Yosi\Desktop\Projects\Pharmacy Inventory Management System\Pharmacy-Inv
 C:\Users\Yosi\Desktop\Projects\Pharmacy Inventory Management System\Pharmacy-Inventory-Management-System-\api\obj\Debug\net8.0\Api.pdb
 C:\Users\Yosi\Desktop\Projects\Pharmacy Inventory Management System\Pharmacy-Inventory-Management-System-\api\obj\Debug\net8.0\Api.genruntimeconfig.cache
 C:\Users\Yosi\Desktop\Projects\Pharmacy Inventory Management System\Pharmacy-Inventory-Management-System-\api\obj\Debug\net8.0\ref\Api.dll
+C:\Users\Yosi\Desktop\Projects\Pharmacy Inventory Management System\Pharmacy-Inventory-Management-System-\api\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
