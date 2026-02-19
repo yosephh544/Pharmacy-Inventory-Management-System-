@@ -1,56 +1,90 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using IntegratedImplementation.Interfaces;
+using IntegratedImplementation.DTOs.Batches;
 
 namespace IntegratedApi.Controllers
 {
     [ApiController]
     [Route("api/batches")]
-    [Authorize]
+     [Authorize]
     public class MedicineBatchesController : ControllerBase
     {
-        [HttpGet]
-        public IActionResult GetBatches()
+        private readonly IMedicineBatchService _batchService;
+
+        public MedicineBatchesController(IMedicineBatchService batchService)
         {
-            return Ok(new object[0]);
+            _batchService = batchService;
         }
 
-        [HttpGet("{id}")]
-        public IActionResult GetBatchById([FromRoute] int id)
+        [HttpGet("GetBAtchByID/{id}")]
+        public async Task<IActionResult> GetBatchById([FromRoute] int id)
         {
-            return Ok(new { id });
+            try
+            {
+                var batch = await _batchService.GetBatchByIdAsync(id);
+                return Ok(batch);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
         }
 
-        [HttpGet("medicine/{medicineId}")]
-        public IActionResult GetBatchesByMedicine([FromRoute] int medicineId)
+        [HttpGet("GetBatchesByMedicine/{medicineId}")]
+        public async Task<IActionResult> GetBatchesByMedicine([FromRoute] int medicineId)
         {
-            return Ok(new object[0]);
+            var batches = await _batchService.GetBatchesByMedicineIdAsync(medicineId);
+            return Ok(batches);
         }
 
-        [HttpPost]
-        [Authorize(Roles = "Admin,Storekeeper")]
-        public IActionResult CreateBatch([FromBody] object model)
+        [HttpPost("CreateBatch")]
+        [Authorize(Roles = "Admin,Storekeeper,Pharmacist")]
+        public async Task<IActionResult> CreateBatch([FromBody] CreateBatchRequestDto dto)
         {
-            return CreatedAtAction(nameof(GetBatchById), new { id = 0 }, model);
+            try
+            {
+                var batch = await _batchService.CreateBatchAsync(dto);
+                return CreatedAtAction(nameof(GetBatchById), new { id = batch.Id }, batch);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,Storekeeper")]
-        public IActionResult UpdateBatch([FromRoute] int id, [FromBody] object model)
+        [HttpPut("UpdateBatch/{id}")]
+        [Authorize(Roles = "Admin,Storekeeper,Pharmacist")]
+        public async Task<IActionResult> UpdateBatch([FromRoute] int id, [FromBody] UpdateBatchRequestDto dto)
         {
-            return NoContent();
+            try
+            {
+                var batch = await _batchService.UpdateBatchAsync(id, dto);
+                return Ok(batch);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
         }
 
-        [HttpPost("{id}/adjust")]
-        [Authorize(Roles = "Admin,Storekeeper")]
-        public IActionResult AdjustStock([FromRoute] int id, [FromBody] object adjustment)
+        [HttpPost("AdjustStock/{id}")]
+        [Authorize(Roles = "Admin,Storekeeper,Pharmacist")]
+        public async Task<IActionResult> AdjustStock([FromRoute] int id, [FromBody] AdjustStockRequestDto dto)
         {
+            var result = await _batchService.AdjustStockAsync(id, dto);
+            if (!result) return NotFound();
             return Ok();
         }
 
-        [HttpDelete("{id}")]
+        [HttpDelete("DeleteBatch/{id}")]
         [Authorize(Roles = "Admin")]
-        public IActionResult SoftDeleteBatch([FromRoute] int id)
+        public async Task<IActionResult> SoftDeleteBatch([FromRoute] int id)
         {
+            var result = await _batchService.DeleteBatchAsync(id);
+            if (!result) return NotFound();
             return NoContent();
         }
     }

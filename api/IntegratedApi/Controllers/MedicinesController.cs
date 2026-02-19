@@ -1,43 +1,81 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using IntegratedImplementation.Interfaces;
+using IntegratedImplementation.DTOs.Medicines;
 
 namespace IntegratedApi.Controllers
 {
 	[ApiController]
 	[Route("api/medicines")]
-	[Authorize]
+	 [Authorize]
 	public class MedicinesController : ControllerBase
 	{
-		[HttpGet]
-		public IActionResult GetMedicines()
+		private readonly IMedicineService _medicineService;
+
+		public MedicinesController(IMedicineService medicineService)
 		{
-			return Ok(new object[0]);
+			_medicineService = medicineService;
 		}
 
-		[HttpGet("{id}")]
-		public IActionResult GetMedicineById([FromRoute] int id)
+		[HttpGet("GetMedicines")]
+		public async Task<IActionResult> GetMedicines()
 		{
-			return Ok(new { id });
+			var medicines = await _medicineService.GetAllMedicinesAsync();
+			return Ok(medicines);
 		}
 
-		[HttpPost]
-		[Authorize(Roles = "Admin,Storekeeper")]
-		public IActionResult CreateMedicine([FromBody] object model)
+		[HttpGet("GetMedicineById/{id}")]
+		public async Task<IActionResult> GetMedicineById([FromRoute] int id)
 		{
-			return Created(string.Empty, model);
+			try
+			{
+				var medicine = await _medicineService.GetMedicineByIdAsync(id);
+				return Ok(medicine);
+			}
+			catch (KeyNotFoundException ex)
+			{
+				return NotFound(ex.Message);
+			}
 		}
 
-		[HttpPut("{id}")]
-		[Authorize(Roles = "Admin,Storekeeper")]
-		public IActionResult UpdateMedicine([FromRoute] int id, [FromBody] object model)
+		[HttpPost("CreateMedicine")]
+		[Authorize(Roles = "Admin,Storekeeper,Pharmacist")]
+		public async Task<IActionResult> CreateMedicine([FromBody] CreateMedicineRequestDto dto)
 		{
-			return NoContent();
+			try
+			{
+				var medicine = await _medicineService.CreateMedicineAsync(dto);
+				return CreatedAtAction(nameof(GetMedicineById), new { id = medicine.Id }, medicine);
+			}
+			catch (InvalidOperationException ex)
+			{
+				return BadRequest(ex.Message);
+			}
 		}
 
-		[HttpDelete("{id}")]
+		[HttpPut("UpdateMedicine/{id}")]
+		[Authorize(Roles = "Admin,Storekeeper,Pharmacist")]
+		public async Task<IActionResult> UpdateMedicine([FromRoute] int id, [FromBody] UpdateMedicineRequestDto dto)
+		{
+			try
+			{
+				var medicine = await _medicineService.UpdateMedicineAsync(id, dto);
+				return Ok(medicine);
+			}
+			catch (KeyNotFoundException ex)
+			{
+				return NotFound(ex.Message);
+			}
+		}
+
+		[HttpDelete("DeleteMedicine/{id}")]
 		[Authorize(Roles = "Admin")]
-		public IActionResult DeleteMedicine([FromRoute] int id)
+		public async Task<IActionResult> DeleteMedicine([FromRoute] int id)
 		{
+			var result = await _medicineService.DeleteMedicineAsync(id);
+			if (!result) return NotFound();
 			return NoContent();
 		}
 	}
