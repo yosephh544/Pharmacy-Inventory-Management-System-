@@ -19,16 +19,19 @@ namespace IntegratedImplementation.Services
     {
         private readonly PharmacyDbContext _context;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly IAuditLogService _auditLogService;
         private readonly IConfiguration _configuration;
 
         public AuthService(
             PharmacyDbContext context,
             IConfiguration configuration,
-            IPasswordHasher<User> passwordHasher)
+            IPasswordHasher<User> passwordHasher,
+            IAuditLogService auditLogService)
         {
             _context = context;
             _configuration = configuration;
             _passwordHasher = passwordHasher;
+            _auditLogService = auditLogService;
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginRequestDto dto)
@@ -50,6 +53,8 @@ namespace IntegratedImplementation.Services
                 throw new UnauthorizedAccessException("Invalid credentials");
 
             var accessToken = GenerateAccessToken(user);
+
+            await _auditLogService.LogActionAsync(user.Id, "Login", "User", user.Id);
 
             return new AuthResponseDto
             {

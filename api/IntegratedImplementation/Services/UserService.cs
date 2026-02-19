@@ -11,13 +11,16 @@ namespace IntegratedImplementation.Services
     {
         private readonly PharmacyDbContext _context;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly IAuditLogService _auditLogService;
 
         public UserService(
             PharmacyDbContext context,
-            IPasswordHasher<User> passwordHasher)
+            IPasswordHasher<User> passwordHasher,
+            IAuditLogService auditLogService)
         {
             _context = context;
             _passwordHasher = passwordHasher;
+            _auditLogService = auditLogService;
         }
 
         public async Task<IEnumerable<UserListItemDto>> GetAllUsersAsync()
@@ -120,6 +123,8 @@ namespace IntegratedImplementation.Services
 
             await _context.SaveChangesAsync();
 
+            await _auditLogService.LogActionAsync(null, "CreateUser", "User", user.Id, null, System.Text.Json.JsonSerializer.Serialize(new { user.Username, user.FullName, Roles = roles.Select(r => r.Name) }));
+
             // Reload user with roles
             var createdUser = await _context.Users
                 .Include(u => u.UserRoles)
@@ -147,12 +152,25 @@ namespace IntegratedImplementation.Services
             if (user == null)
                 throw new KeyNotFoundException($"User with ID {id} not found");
 
+            // Capture old state for audit log
+            var oldState = new
+            {
+                user.FullName,
+                user.IsActive,
+                Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList()
+            };
+
             // Update fields if provided
             if (dto.FullName != null)
                 user.FullName = dto.FullName;
 
+            bool activated = false;
             if (dto.IsActive.HasValue)
+            {
+                if (!user.IsActive && dto.IsActive.Value)
+                    activated = true;
                 user.IsActive = dto.IsActive.Value;
+            }
 
             // Update roles if provided
             if (dto.RoleIds != null)
@@ -187,6 +205,26 @@ namespace IntegratedImplementation.Services
 
             await _context.SaveChangesAsync();
 
+            // Capture new state for audit log
+            var newState = new
+            {
+                updatedUserSnapshot = await _context.Users
+                    .Include(u => u.UserRoles)
+                        .ThenInclude(ur => ur.Role)
+                    .Where(u => u.Id == id)
+                    .Select(u => new { u.FullName, u.IsActive, Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList() })
+                    .FirstOrDefaultAsync()
+            };
+
+            var actionName = activated ? "ActivateUser" : "UpdateUser";
+            await _auditLogService.LogActionAsync(
+                null, 
+                actionName, 
+                "User", 
+                id, 
+                System.Text.Json.JsonSerializer.Serialize(oldState), 
+                System.Text.Json.JsonSerializer.Serialize(newState.updatedUserSnapshot));
+
             // Reload user with updated roles
             var updatedUser = await _context.Users
                 .Include(u => u.UserRoles)
@@ -207,13 +245,27 @@ namespace IntegratedImplementation.Services
         public async Task<bool> DeactivateUserAsync(int id)
         {
             var user = await _context.Users
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (user == null)
                 return false;
 
+            var oldState = new { user.FullName, user.IsActive, Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList() };
+
             user.IsActive = false;
             await _context.SaveChangesAsync();
+
+            var newState = new { user.FullName, user.IsActive, Roles = user.UserRoles.Select(ur => ur.Role.Name).ToList() };
+
+            await _auditLogService.LogActionAsync(
+                null, 
+                "DeactivateUser", 
+                "User", 
+                id, 
+                System.Text.Json.JsonSerializer.Serialize(oldState), 
+                System.Text.Json.JsonSerializer.Serialize(newState));
 
             return true;
         }

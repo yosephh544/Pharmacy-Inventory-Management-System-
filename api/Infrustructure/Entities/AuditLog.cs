@@ -13,5 +13,6 @@ namespace Infrustructure.Entities
 
         public string? OldValues { get; set; }
         public string? NewValues { get; set; }
+        public string? IPAddress { get; set; }
     }
 }
