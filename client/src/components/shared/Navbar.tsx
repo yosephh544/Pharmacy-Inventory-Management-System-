@@ -1,13 +1,49 @@
-import { useState } from 'react';
-import { Navbar as BSNavbar, Form, InputGroup, Dropdown, Badge } from 'react-bootstrap';
-import { FaPills, FaSearch, FaBell, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import { Navbar as BSNavbar, Form, InputGroup, Dropdown, Badge, Spinner } from 'react-bootstrap';
+import { FaPills, FaSearch, FaBell, FaUser, FaSignOutAlt, FaExclamationTriangle, FaBox } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/authService';
+import api from '../../services/api';
+
+interface Notification {
+    id: number;
+    title: string;
+    message: string;
+    type: string;
+    isRead: boolean;
+    createdAt: string;
+    linkUrl?: string;
+}
+
+interface NotificationSummary {
+    unreadCount: number;
+    notifications: Notification[];
+}
 
 const Navbar = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
-    const [notificationCount] = useState(3); // Placeholder notification count
+    const [notifications, setNotifications] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] });
+    const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+    const loadNotifications = async () => {
+        setLoadingNotifications(true);
+        try {
+            const res = await api.get<NotificationSummary>('/notifications');
+            setNotifications(res.data);
+        } catch (err) {
+            console.error('Failed to load notifications:', err);
+        } finally {
+            setLoadingNotifications(false);
+        }
+    };
+
+    useEffect(() => {
+        loadNotifications();
+        // Refresh notifications every 5 minutes
+        const interval = setInterval(loadNotifications, 5 * 60 * 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleLogout = () => {
         authService.logout();
@@ -18,6 +54,68 @@ const Navbar = () => {
         e.preventDefault();
         // TODO: Implement search functionality
         console.log('Search query:', searchQuery);
+    };
+
+    const handleNotificationClick = async (notification: Notification) => {
+        if (!notification.isRead && notification.id > 0) {
+            try {
+                await api.post(`/notifications/${notification.id}/read`);
+                // Update local state
+                setNotifications(prev => ({
+                    ...prev,
+                    notifications: prev.notifications.map(n =>
+                        n.id === notification.id ? { ...n, isRead: true } : n
+                    ),
+                    unreadCount: Math.max(0, prev.unreadCount - 1)
+                }));
+            } catch (err) {
+                console.error('Failed to mark notification as read:', err);
+            }
+        }
+
+        if (notification.linkUrl) {
+            navigate(notification.linkUrl);
+        }
+    };
+
+    const handleDeleteNotification = async (e: React.MouseEvent, notificationId: number) => {
+        e.stopPropagation();
+        try {
+            await api.delete(`/notifications/${notificationId}`);
+            setNotifications(prev => ({
+                ...prev,
+                notifications: prev.notifications.filter(n => n.id !== notificationId),
+                unreadCount: prev.notifications.filter(n => n.id !== notificationId && !n.isRead).length
+            }));
+        } catch (err) {
+            console.error('Failed to delete notification:', err);
+        }
+    };
+
+    const getNotificationIcon = (type: string) => {
+        switch (type) {
+            case 'low-stock':
+                return <FaBox className="text-warning me-2" />;
+            case 'near-expiry':
+                return <FaExclamationTriangle className="text-danger me-2" />;
+            case 'expired':
+                return <FaExclamationTriangle className="text-danger me-2" />;
+            default:
+                return <FaBell className="text-primary me-2" />;
+        }
+    };
+
+    const getNotificationBadgeColor = (type: string) => {
+        switch (type) {
+            case 'low-stock':
+                return 'warning';
+            case 'near-expiry':
+                return 'danger';
+            case 'expired':
+                return 'danger';
+            default:
+                return 'primary';
+        }
     };
 
     return (
@@ -48,33 +146,96 @@ const Navbar = () => {
                     </Form>
 
                     {/* Notification Bell */}
-                    <Dropdown align="end">
+                    <Dropdown align="end" onToggle={() => !loadingNotifications && loadNotifications()}>
                         <Dropdown.Toggle
                             variant="link"
                             className="notification-btn position-relative p-2 text-white"
                             id="notification-dropdown"
                         >
                             <FaBell size={20} />
-                            {notificationCount > 0 && (
+                            {notifications.unreadCount > 0 && (
                                 <Badge
                                     bg="danger"
                                     pill
                                     className="position-absolute top-0 start-100 translate-middle notification-badge"
                                 >
-                                    {notificationCount}
+                                    {notifications.unreadCount > 99 ? '99+' : notifications.unreadCount}
                                 </Badge>
                             )}
                         </Dropdown.Toggle>
 
-                        <Dropdown.Menu className="notification-dropdown">
-                            <Dropdown.Header>Notifications</Dropdown.Header>
-                            <Dropdown.Item>Low stock alert: Aspirin</Dropdown.Item>
-                            <Dropdown.Item>New order received</Dropdown.Item>
-                            <Dropdown.Item>Inventory update completed</Dropdown.Item>
+                        <Dropdown.Menu className="notification-dropdown" style={{ minWidth: '350px', maxHeight: '500px', overflowY: 'auto' }}>
+                            <Dropdown.Header className="d-flex justify-content-between align-items-center">
+                                <span>Notifications</span>
+                                {notifications.unreadCount > 0 && (
+                                    <Badge bg="danger" pill>
+                                        {notifications.unreadCount} new
+                                    </Badge>
+                                )}
+                            </Dropdown.Header>
                             <Dropdown.Divider />
-                            <Dropdown.Item className="text-center text-primary">
-                                View all notifications
-                            </Dropdown.Item>
+                            {loadingNotifications ? (
+                                <Dropdown.Item disabled>
+                                    <div className="text-center py-2">
+                                        <Spinner animation="border" size="sm" />
+                                    </div>
+                                </Dropdown.Item>
+                            ) : notifications.notifications.length === 0 ? (
+                                <Dropdown.Item disabled>
+                                    <div className="text-center text-muted py-3">
+                                        No notifications
+                                    </div>
+                                </Dropdown.Item>
+                            ) : (
+                                <>
+                                    {notifications.notifications.map((notification) => (
+                                        <Dropdown.Item
+                                            key={notification.id}
+                                            onClick={() => handleNotificationClick(notification)}
+                                            className={`p-3 ${!notification.isRead ? 'bg-light' : ''}`}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <div className="d-flex justify-content-between align-items-start">
+                                                <div className="flex-grow-1">
+                                                    <div className="d-flex align-items-center mb-1">
+                                                        {getNotificationIcon(notification.type)}
+                                                        <strong className={!notification.isRead ? 'fw-bold' : ''}>
+                                                            {notification.title}
+                                                        </strong>
+                                                        {!notification.isRead && (
+                                                            <Badge bg={getNotificationBadgeColor(notification.type)} pill className="ms-2">
+                                                                New
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-muted small ms-4">
+                                                        {notification.message}
+                                                    </div>
+                                                    <div className="text-muted small ms-4 mt-1">
+                                                        {new Date(notification.createdAt).toLocaleString()}
+                                                    </div>
+                                                </div>
+                                                {notification.id > 0 && (
+                                                    <button
+                                                        className="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                        onClick={(e) => handleDeleteNotification(e, notification.id)}
+                                                        style={{ fontSize: '0.75rem' }}
+                                                    >
+                                                        ×
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </Dropdown.Item>
+                                    ))}
+                                    <Dropdown.Divider />
+                                    <Dropdown.Item
+                                        className="text-center text-primary"
+                                        onClick={() => navigate('/reports/current-stock')}
+                                    >
+                                        View All Reports
+                                    </Dropdown.Item>
+                                </>
+                            )}
                         </Dropdown.Menu>
                     </Dropdown>
 

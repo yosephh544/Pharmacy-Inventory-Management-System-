@@ -10,6 +10,10 @@ namespace Infrustructure.Entities
 
         public string? PaymentMethod { get; set; }
 
+        /// <summary>When true, sale was cancelled and batch quantities were restored.</summary>
+        public bool IsCancelled { get; set; }
+
+        public int? CreatedByUserId { get; set; }
         public User? CreatedByUser { get; set; }
 
         public int SoldByUserId { get; set; }
