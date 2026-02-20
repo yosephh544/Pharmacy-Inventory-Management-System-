@@ -35,6 +35,8 @@ namespace IntegratedImplementation.Services
                     GenericName = m.GenericName,
                     CategoryName = m.Category.Name,
                     TotalStock = m.Batches.Sum(b => b.Quantity),
+                    ReorderLevel = m.ReorderLevel,
+                    UnitPrice = m.UnitPrice,
                     IsActive = m.IsActive
                 })
                 .ToListAsync();

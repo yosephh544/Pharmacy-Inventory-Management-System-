@@ -58,6 +58,17 @@ namespace IntegratedImplementation.Services
             if (medicine == null)
                 throw new InvalidOperationException("Invalid Medicine ID");
 
+            // If SupplierId is 0 or not provided, fall back to a default/first supplier
+            var supplierId = dto.SupplierId;
+            if (supplierId == 0)
+            {
+                var defaultSupplier = await _context.Suppliers.FirstOrDefaultAsync();
+                if (defaultSupplier == null)
+                    throw new InvalidOperationException("No supplier is configured. Please create a supplier or provide a valid SupplierId.");
+
+                supplierId = defaultSupplier.Id;
+            }
+
             var batch = new MedicineBatch
             {
                 MedicineId = dto.MedicineId,
@@ -66,7 +77,7 @@ namespace IntegratedImplementation.Services
                 Quantity = dto.Quantity,
                 PurchasePrice = dto.PurchasePrice,
                 SellingPrice = dto.SellingPrice,
-                SupplierId = dto.SupplierId,
+                SupplierId = supplierId,
                 ReceivedDate = dto.ReceivedDate ?? DateTime.UtcNow,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
@@ -97,7 +108,20 @@ namespace IntegratedImplementation.Services
             if (dto.Quantity.HasValue) batch.Quantity = dto.Quantity.Value;
             if (dto.PurchasePrice.HasValue) batch.PurchasePrice = dto.PurchasePrice.Value;
             if (dto.SellingPrice.HasValue) batch.SellingPrice = dto.SellingPrice.Value;
-            if (dto.SupplierId.HasValue) batch.SupplierId = dto.SupplierId.Value;
+            if (dto.SupplierId.HasValue)
+            {
+                var supplierId = dto.SupplierId.Value;
+                if (supplierId == 0)
+                {
+                    var defaultSupplier = await _context.Suppliers.FirstOrDefaultAsync();
+                    if (defaultSupplier == null)
+                        throw new InvalidOperationException("No supplier is configured. Please create a supplier or provide a valid SupplierId.");
+
+                    supplierId = defaultSupplier.Id;
+                }
+
+                batch.SupplierId = supplierId;
+            }
             if (dto.IsActive.HasValue) batch.IsActive = dto.IsActive.Value;
 
             await _context.SaveChangesAsync();

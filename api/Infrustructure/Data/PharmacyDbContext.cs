@@ -121,6 +121,23 @@ namespace Pharmacy.Infrastructure.Data
             modelBuilder.Entity<PurchaseItem>()
                 .Property(x => x.UnitPrice)
                 .HasPrecision(18, 2);
+
+            // Additional decimal precision mappings to avoid truncation warnings
+            modelBuilder.Entity<Medicine>()
+                .Property(x => x.UnitPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Purchase>()
+                .Property(x => x.TotalAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<PurchaseItem>()
+                .Property(x => x.UnitCost)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Sale>()
+                .Property(x => x.TotalAmount)
+                .HasPrecision(18, 2);
         }
     }
 }

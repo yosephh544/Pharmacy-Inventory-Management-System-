@@ -10,6 +10,8 @@ namespace IntegratedImplementation.DTOs.Medicines
         public string? GenericName { get; set; }
         public string? CategoryName { get; set; }
         public int TotalStock { get; set; }
+        public int ReorderLevel { get; set; }
+        public decimal? UnitPrice { get; set; }
         public bool IsActive { get; set; }
     }
 

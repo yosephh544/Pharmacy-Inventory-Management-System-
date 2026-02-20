@@ -75,8 +75,10 @@ namespace IntegratedApi.Controllers
 		public async Task<IActionResult> DeleteMedicine([FromRoute] int id)
 		{
 			var result = await _medicineService.DeleteMedicineAsync(id);
-			if (!result) return NotFound();
-			return NoContent();
+			if (!result)
+				return NotFound(new { message = $"Medicine with ID {id} not found" });
+
+			return Ok(new { message = $"Medicine with ID {id} was deleted successfully" });
 		}
 	}
 }

@@ -75,8 +75,10 @@ namespace IntegratedApi.Controllers
         public async Task<IActionResult> AdjustStock([FromRoute] int id, [FromBody] AdjustStockRequestDto dto)
         {
             var result = await _batchService.AdjustStockAsync(id, dto);
-            if (!result) return NotFound();
-            return Ok();
+			if (!result)
+				return NotFound(new { message = $"Batch with ID {id} not found" });
+
+			return Ok(new { message = $"Stock for batch with ID {id} was adjusted successfully" });
         }
 
         [HttpDelete("DeleteBatch/{id}")]
@@ -84,8 +86,10 @@ namespace IntegratedApi.Controllers
         public async Task<IActionResult> SoftDeleteBatch([FromRoute] int id)
         {
             var result = await _batchService.DeleteBatchAsync(id);
-            if (!result) return NotFound();
-            return NoContent();
+			if (!result)
+				return NotFound(new { message = $"Batch with ID {id} not found" });
+
+			return Ok(new { message = $"Batch with ID {id} was deleted successfully" });
         }
     }
 }

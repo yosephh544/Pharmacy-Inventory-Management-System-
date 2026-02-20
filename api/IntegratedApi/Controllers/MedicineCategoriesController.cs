@@ -55,12 +55,14 @@ namespace IntegratedApi.Controllers
             try
             {
                 var result = await _categoryService.DeleteCategoryAsync(id);
-                if (!result) return NotFound();
-                return NoContent();
+				if (!result)
+					return NotFound(new { message = $"Medicine category with ID {id} not found" });
+
+				return Ok(new { message = $"Medicine category with ID {id} was deleted successfully" });
             }
             catch (System.InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+				return BadRequest(new { message = ex.Message });
             }
         }
     }

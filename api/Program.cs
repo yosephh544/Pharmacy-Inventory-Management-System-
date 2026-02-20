@@ -215,6 +215,23 @@ using (var scope = app.Services.CreateScope())
 		db.SaveChanges();
 		Console.WriteLine("DevSeed: Assigned Admin role to admin user");
 	}
+
+	// Seed a default supplier so batches can be created even when SupplierId is not explicitly provided
+	if (!db.Suppliers.Any())
+	{
+		var supplier = new Supplier
+		{
+			Name = "Default Supplier",
+			Phone = "0000000000",
+			Address = "Unknown",
+			Email = null,
+			LicenseNumber = null,
+			CreatedAt = DateTime.UtcNow
+		};
+		db.Suppliers.Add(supplier);
+		db.SaveChanges();
+		Console.WriteLine("DevSeed: Created default supplier");
+	}
 }
 
 
