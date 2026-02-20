@@ -9,6 +9,7 @@ import SystemUsers from './pages/SystemUsers';
 import CurrentStock from './pages/reports/CurrentStock';
 import SalesReport from './pages/reports/SalesReport';
 import ExpiryReport from './pages/reports/ExpiryReport';
+import PurchaseHistory from './pages/reports/PurchaseHistory';
 import MainLayout from './components/shared/MainLayout';
 import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
@@ -41,6 +42,7 @@ function App() {
             <Route path="/reports/current-stock" element={<CurrentStock />} />
             <Route path="/reports/sales" element={<SalesReport />} />
             <Route path="/reports/expiry" element={<ExpiryReport />} />
+            <Route path="/reports/purchase-history" element={<PurchaseHistory />} />
           </Route>
         </Route>
 

@@ -109,6 +109,13 @@ const Sidebar = () => {
                             >
                                 <span>Expiry Report</span>
                             </NavLink>
+
+                            <NavLink
+                                to="/reports/purchase-history"
+                                className={({ isActive }) => `sidebar-submenu-item ${isActive ? 'active' : ''}`}
+                            >
+                                <span>Purchase History</span>
+                            </NavLink>
                         </div>
                     )}
                 </div>
