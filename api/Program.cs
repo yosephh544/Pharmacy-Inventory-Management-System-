@@ -13,7 +13,11 @@ using Microsoft.Extensions.Logging;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 
 // JWT Authentication Configuration
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "super_secret_key_which_is_at_least_32_characters_long";

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navbar as BSNavbar, Form, InputGroup, Dropdown, Badge, Spinner } from 'react-bootstrap';
 import { FaPills, FaSearch, FaBell, FaUser, FaSignOutAlt, FaExclamationTriangle, FaBox } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
@@ -25,25 +25,85 @@ const Navbar = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [notifications, setNotifications] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] });
     const [loadingNotifications, setLoadingNotifications] = useState(false);
+    const [readDynamicNotifications, setReadDynamicNotifications] = useState<Set<number>>(new Set());
 
-    const loadNotifications = async () => {
+    // Load read dynamic notifications from localStorage
+    useEffect(() => {
+        const stored = localStorage.getItem('readDynamicNotifications');
+        if (stored) {
+            try {
+                const ids = JSON.parse(stored) as number[];
+                setReadDynamicNotifications(new Set(ids));
+            } catch (e) {
+                console.error('Failed to load read notifications from localStorage', e);
+            }
+        }
+    }, []);
+
+    const loadNotifications = useCallback(async () => {
+        const token = authService.getCurrentUser();
+        if (!token) {
+            setNotifications({ unreadCount: 0, notifications: [] });
+            return;
+        }
         setLoadingNotifications(true);
         try {
-            const res = await api.get<NotificationSummary>('/notifications');
-            setNotifications(res.data);
+            const res = await api.get('/notifications');
+            // Support both camelCase and PascalCase from API
+            const data = res.data as Record<string, unknown>;
+            const rawNotifications = (data.notifications ?? data.Notifications ?? []) as unknown[];
+
+            // Normalize notification objects (API may return camelCase or PascalCase)
+            const list = rawNotifications.map((n: unknown) => {
+                const o = n as Record<string, unknown>;
+                return {
+                    id: Number(o.id ?? o.Id),
+                    title: String(o.title ?? o.Title ?? ''),
+                    message: String(o.message ?? o.Message ?? ''),
+                    type: String(o.type ?? o.Type ?? 'system'),
+                    isRead: Boolean(o.isRead ?? o.IsRead),
+                    createdAt: String(o.createdAt ?? o.CreatedAt ?? new Date().toISOString()),
+                    linkUrl: o.linkUrl != null ? String(o.linkUrl) : o.LinkUrl != null ? String(o.LinkUrl) : undefined,
+                };
+            });
+
+            // Get current read state from localStorage for dynamic notifications
+            const stored = localStorage.getItem('readDynamicNotifications');
+            const readSet = stored ? new Set(JSON.parse(stored) as number[]) : readDynamicNotifications;
+
+            const processedNotifications = list.map(n => {
+                if (n.id < 0 || n.id > 100000) {
+                    return { ...n, isRead: readSet.has(n.id) };
+                }
+                return n;
+            });
+
+            const unreadCount = processedNotifications.filter(n => !n.isRead).length;
+            setNotifications({
+                unreadCount,
+                notifications: processedNotifications,
+            });
         } catch (err) {
             console.error('Failed to load notifications:', err);
+            setNotifications({ unreadCount: 0, notifications: [] });
         } finally {
             setLoadingNotifications(false);
         }
-    };
+    }, []);
 
+    // Load from API on mount (when authenticated) and refresh periodically
     useEffect(() => {
         loadNotifications();
-        // Refresh notifications every 5 minutes
         const interval = setInterval(loadNotifications, 5 * 60 * 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [loadNotifications]);
+
+    // Refetch from API whenever the user opens the notification dropdown
+    const handleNotificationDropdownToggle = useCallback((isOpen: boolean) => {
+        if (isOpen) {
+            loadNotifications();
+        }
+    }, [loadNotifications]);
 
     const handleLogout = () => {
         authService.logout();
@@ -57,7 +117,24 @@ const Navbar = () => {
     };
 
     const handleNotificationClick = async (notification: Notification) => {
-        if (!notification.isRead && notification.id > 0) {
+        // Handle dynamic notifications (negative IDs or high IDs) - store in localStorage
+        if (!notification.isRead && (notification.id < 0 || notification.id > 100000)) {
+            const newReadSet = new Set(readDynamicNotifications);
+            newReadSet.add(notification.id);
+            setReadDynamicNotifications(newReadSet);
+            localStorage.setItem('readDynamicNotifications', JSON.stringify(Array.from(newReadSet)));
+            
+            // Update local state
+            setNotifications(prev => ({
+                ...prev,
+                notifications: prev.notifications.map(n =>
+                    n.id === notification.id ? { ...n, isRead: true } : n
+                ),
+                unreadCount: Math.max(0, prev.unreadCount - 1)
+            }));
+        }
+        // Handle stored notifications (positive IDs < 100000)
+        else if (!notification.isRead && notification.id > 0 && notification.id < 100000) {
             try {
                 await api.post(`/notifications/${notification.id}/read`);
                 // Update local state
@@ -80,6 +157,23 @@ const Navbar = () => {
 
     const handleDeleteNotification = async (e: React.MouseEvent, notificationId: number) => {
         e.stopPropagation();
+        
+        // Handle dynamic notifications - remove from localStorage
+        if (notificationId < 0 || notificationId > 100000) {
+            const newReadSet = new Set(readDynamicNotifications);
+            newReadSet.delete(notificationId);
+            setReadDynamicNotifications(newReadSet);
+            localStorage.setItem('readDynamicNotifications', JSON.stringify(Array.from(newReadSet)));
+            
+            setNotifications(prev => ({
+                ...prev,
+                notifications: prev.notifications.filter(n => n.id !== notificationId),
+                unreadCount: prev.notifications.filter(n => n.id !== notificationId && !n.isRead).length
+            }));
+            return;
+        }
+        
+        // Handle stored notifications
         try {
             await api.delete(`/notifications/${notificationId}`);
             setNotifications(prev => ({
@@ -146,7 +240,7 @@ const Navbar = () => {
                     </Form>
 
                     {/* Notification Bell */}
-                    <Dropdown align="end" onToggle={() => !loadingNotifications && loadNotifications()}>
+                    <Dropdown align="end" onToggle={handleNotificationDropdownToggle}>
                         <Dropdown.Toggle
                             variant="link"
                             className="notification-btn position-relative p-2 text-white"

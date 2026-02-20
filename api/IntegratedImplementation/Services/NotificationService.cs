@@ -24,28 +24,50 @@ namespace IntegratedImplementation.Services
         {
             var notifications = new List<NotificationDto>();
 
-            // Get low stock medicines
-            var lowStockMedicines = await _context.Medicines
+            // Get all active medicines with batches, then filter low stock in memory (EF has trouble with Sum in Where)
+            var medicinesWithBatches = await _context.Medicines
                 .Include(m => m.Category)
                 .Include(m => m.Batches)
-                .Where(m => m.IsActive
-                    && m.ReorderLevel > 0
-                    && m.Batches.Where(b => b.IsActive).Sum(b => b.Quantity) <= m.ReorderLevel)
+                .Where(m => m.IsActive && m.ReorderLevel > 0)
                 .ToListAsync(cancellationToken);
 
-            foreach (var medicine in lowStockMedicines)
+            var lowStockMedicines = medicinesWithBatches
+                .Where(m => m.Batches.Where(b => b.IsActive).Sum(b => b.Quantity) <= m.ReorderLevel)
+                .OrderBy(m => m.Batches.Where(b => b.IsActive).Sum(b => b.Quantity))
+                .ToList();
+
+            if (lowStockMedicines.Count > 0)
             {
-                var totalStock = medicine.Batches.Where(b => b.IsActive).Sum(b => b.Quantity);
-                notifications.Add(new NotificationDto
+                // Add summary notification if more than 5 items
+                if (lowStockMedicines.Count > 5)
                 {
-                    Id = -medicine.Id, // Negative ID to indicate it's a dynamic notification
-                    Title = "Low Stock Alert",
-                    Message = $"{medicine.Name} ({medicine.Code}) is running low. Current stock: {totalStock}, Reorder level: {medicine.ReorderLevel}",
-                    Type = "low-stock",
-                    IsRead = false,
-                    CreatedAt = DateTime.UtcNow,
-                    LinkUrl = $"/medicines"
-                });
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = -999999, // Special ID for summary
+                        Title = "Low Stock Alert - Summary",
+                        Message = $"{lowStockMedicines.Count} medicines are running low on stock. Click to view details.",
+                        Type = "low-stock",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/reports/current-stock"
+                    });
+                }
+
+                // Add individual notifications for top 5 most critical (lowest stock)
+                foreach (var medicine in lowStockMedicines.Take(5))
+                {
+                    var totalStock = medicine.Batches.Where(b => b.IsActive).Sum(b => b.Quantity);
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = -medicine.Id, // Negative ID to indicate it's a dynamic notification
+                        Title = "Low Stock Alert",
+                        Message = $"{medicine.Name} ({medicine.Code}) is running low. Current stock: {totalStock}, Reorder level: {medicine.ReorderLevel}",
+                        Type = "low-stock",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/medicines"
+                    });
+                }
             }
 
             // Get near expiry batches (within 30 days)
@@ -59,23 +81,60 @@ namespace IntegratedImplementation.Services
                     && b.ExpiryDate >= today
                     && b.ExpiryDate <= thresholdDate)
                 .OrderBy(b => b.ExpiryDate)
-                .Take(10) // Limit to top 10 most urgent
                 .ToListAsync(cancellationToken);
 
-            foreach (var batch in nearExpiryBatches)
+            if (nearExpiryBatches.Count > 0)
             {
-                var daysUntilExpiry = (batch.ExpiryDate.Date - today).Days;
-                var urgency = daysUntilExpiry <= 7 ? "URGENT" : daysUntilExpiry <= 14 ? "Warning" : "Notice";
-                notifications.Add(new NotificationDto
+                // Group by urgency
+                var urgentBatches = nearExpiryBatches.Where(b => (b.ExpiryDate.Date - today).Days <= 7).ToList();
+                var warningBatches = nearExpiryBatches.Where(b => (b.ExpiryDate.Date - today).Days > 7 && (b.ExpiryDate.Date - today).Days <= 14).ToList();
+
+                // Add summary for urgent batches
+                if (urgentBatches.Count > 0)
                 {
-                    Id = batch.Id + 100000, // Offset to avoid conflicts with medicine IDs
-                    Title = $"{urgency}: Near Expiry",
-                    Message = $"{batch.Medicine.Name} - Batch {batch.BatchNumber} expires in {daysUntilExpiry} day(s) on {batch.ExpiryDate:MMM dd, yyyy}",
-                    Type = "near-expiry",
-                    IsRead = false,
-                    CreatedAt = DateTime.UtcNow,
-                    LinkUrl = $"/reports/expiry"
-                });
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = -888888, // Special ID for urgent summary
+                        Title = "URGENT: Near Expiry",
+                        Message = $"{urgentBatches.Count} batch(es) expiring within 7 days! Immediate action required.",
+                        Type = "near-expiry",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/reports/expiry"
+                    });
+                }
+
+                // Add individual notifications for urgent batches (up to 5)
+                foreach (var batch in urgentBatches.Take(5))
+                {
+                    var daysUntilExpiry = (batch.ExpiryDate.Date - today).Days;
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = batch.Id + 100000, // Offset to avoid conflicts with medicine IDs
+                        Title = "URGENT: Near Expiry",
+                        Message = $"{batch.Medicine.Name} - Batch {batch.BatchNumber} expires in {daysUntilExpiry} day(s) on {batch.ExpiryDate:MMM dd, yyyy}",
+                        Type = "near-expiry",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/reports/expiry"
+                    });
+                }
+
+                // Add individual notifications for warning batches (up to 5)
+                foreach (var batch in warningBatches.Take(5))
+                {
+                    var daysUntilExpiry = (batch.ExpiryDate.Date - today).Days;
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = batch.Id + 100000,
+                        Title = "Warning: Near Expiry",
+                        Message = $"{batch.Medicine.Name} - Batch {batch.BatchNumber} expires in {daysUntilExpiry} day(s) on {batch.ExpiryDate:MMM dd, yyyy}",
+                        Type = "near-expiry",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/reports/expiry"
+                    });
+                }
             }
 
             // Get expired batches with remaining stock
@@ -85,22 +144,39 @@ namespace IntegratedImplementation.Services
                     && b.Quantity > 0
                     && b.ExpiryDate < today)
                 .OrderByDescending(b => b.ExpiryDate)
-                .Take(5) // Limit to top 5 most recent
                 .ToListAsync(cancellationToken);
 
-            foreach (var batch in expiredBatches)
+            if (expiredBatches.Count > 0)
             {
-                var daysExpired = (today - batch.ExpiryDate.Date).Days;
+                var totalExpiredValue = expiredBatches.Sum(b => b.Quantity * b.PurchasePrice);
+                
+                // Add summary notification
                 notifications.Add(new NotificationDto
                 {
-                    Id = batch.Id + 200000, // Offset to avoid conflicts
+                    Id = -777777, // Special ID for expired summary
                     Title = "Expired Stock Alert",
-                    Message = $"{batch.Medicine.Name} - Batch {batch.BatchNumber} expired {daysExpired} day(s) ago. Quantity: {batch.Quantity}",
+                    Message = $"{expiredBatches.Count} expired batch(es) with remaining stock. Total financial loss: {totalExpiredValue:F2} ETB",
                     Type = "expired",
                     IsRead = false,
                     CreatedAt = DateTime.UtcNow,
-                    LinkUrl = $"/reports/expiry"
+                    LinkUrl = "/reports/expiry"
                 });
+
+                // Add individual notifications for most recent expired batches (up to 5)
+                foreach (var batch in expiredBatches.Take(5))
+                {
+                    var daysExpired = (today - batch.ExpiryDate.Date).Days;
+                    notifications.Add(new NotificationDto
+                    {
+                        Id = batch.Id + 200000, // Offset to avoid conflicts
+                        Title = "Expired Stock Alert",
+                        Message = $"{batch.Medicine.Name} - Batch {batch.BatchNumber} expired {daysExpired} day(s) ago. Quantity: {batch.Quantity}",
+                        Type = "expired",
+                        IsRead = false,
+                        CreatedAt = DateTime.UtcNow,
+                        LinkUrl = "/reports/expiry"
+                    });
+                }
             }
 
             // Sort by urgency: expired first, then near-expiry (urgent), then low stock
