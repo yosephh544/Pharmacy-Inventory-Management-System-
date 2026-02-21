@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Infrustructure.Entities;
+using Infrustructure.Common;
 
 namespace Pharmacy.Infrastructure.Data
 {
@@ -11,7 +12,8 @@ namespace Pharmacy.Infrastructure.Data
         {
         }
 
-        // 🔐 AUTH
+        // 🔐 AUTH & PHARMACY
+        public DbSet<PharmacyProfile> PharmacyProfiles => Set<PharmacyProfile>();
         public DbSet<User> Users => Set<User>();
         public DbSet<Role> Roles => Set<Role>();
         public DbSet<UserRole> UserRoles => Set<UserRole>();
@@ -39,6 +41,19 @@ namespace Pharmacy.Infrastructure.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            // Ensure all BaseEntity-derived entities have IsDeleted configured consistently
+            // so migrations produce the same schema on every machine (no drift).
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+                {
+                    modelBuilder.Entity(entityType.ClrType)
+                        .Property(nameof(BaseEntity.IsDeleted))
+                        .IsRequired()
+                        .HasDefaultValue(false);
+                }
+            }
+
             // Composite keys
             modelBuilder.Entity<UserRole>(entity =>
             {
@@ -62,6 +77,16 @@ namespace Pharmacy.Infrastructure.Data
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(x => x.RoleId);
 
+            // PharmacyProfile: explicit table name so it matches InitialCreate and all clones
+            modelBuilder.Entity<PharmacyProfile>()
+                .ToTable("PharmacyProfile");
+
+            // User -> PharmacyProfile
+            modelBuilder.Entity<User>()
+                .HasOne(x => x.PharmacyProfile)
+                .WithMany()
+                .HasForeignKey(x => x.PharmacyProfileId);
+
             // Medicine
             modelBuilder.Entity<Medicine>()
                 .HasIndex(x => x.Code)
@@ -69,7 +94,7 @@ namespace Pharmacy.Infrastructure.Data
 
             modelBuilder.Entity<Medicine>()
                 .HasOne(x => x.Category)
-                .WithMany()
+                .WithMany(c => c.Medicines)
                 .HasForeignKey(x => x.CategoryId);
 
             // MedicineBatch
@@ -90,11 +115,26 @@ namespace Pharmacy.Infrastructure.Data
                 .HasForeignKey(x => x.SupplierId);
 
             modelBuilder.Entity<Purchase>()
+                .HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey("CreatedByUserId");
+
+            modelBuilder.Entity<Purchase>()
                 .HasMany(x => x.Items)
                 .WithOne(x => x.Purchase)
                 .HasForeignKey(x => x.PurchaseId);
 
             // Sale
+            modelBuilder.Entity<Sale>()
+                .HasOne(x => x.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId);
+
+            modelBuilder.Entity<Sale>()
+                .HasOne(x => x.SoldByUser)
+                .WithMany()
+                .HasForeignKey(x => x.SoldByUserId);
+
             modelBuilder.Entity<Sale>()
                 .HasMany(x => x.Items)
                 .WithOne(x => x.Sale)
