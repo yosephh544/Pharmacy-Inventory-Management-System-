@@ -26,6 +26,11 @@ const Navbar = () => {
     const [notifications, setNotifications] = useState<NotificationSummary>({ unreadCount: 0, notifications: [] });
     const [loadingNotifications, setLoadingNotifications] = useState(false);
     const [readDynamicNotifications, setReadDynamicNotifications] = useState<Set<number>>(new Set());
+    const [userProfile, setUserProfile] = useState<any>(null);
+
+    useEffect(() => {
+        setUserProfile(authService.getUserProfile());
+    }, []);
 
     // Load read dynamic notifications from localStorage
     useEffect(() => {
@@ -123,7 +128,7 @@ const Navbar = () => {
             newReadSet.add(notification.id);
             setReadDynamicNotifications(newReadSet);
             localStorage.setItem('readDynamicNotifications', JSON.stringify(Array.from(newReadSet)));
-            
+
             // Update local state
             setNotifications(prev => ({
                 ...prev,
@@ -157,14 +162,14 @@ const Navbar = () => {
 
     const handleDeleteNotification = async (e: React.MouseEvent, notificationId: number) => {
         e.stopPropagation();
-        
+
         // Handle dynamic notifications - remove from localStorage
         if (notificationId < 0 || notificationId > 100000) {
             const newReadSet = new Set(readDynamicNotifications);
             newReadSet.delete(notificationId);
             setReadDynamicNotifications(newReadSet);
             localStorage.setItem('readDynamicNotifications', JSON.stringify(Array.from(newReadSet)));
-            
+
             setNotifications(prev => ({
                 ...prev,
                 notifications: prev.notifications.filter(n => n.id !== notificationId),
@@ -172,7 +177,7 @@ const Navbar = () => {
             }));
             return;
         }
-        
+
         // Handle stored notifications
         try {
             await api.delete(`/notifications/${notificationId}`);
@@ -343,16 +348,16 @@ const Navbar = () => {
                             <div className="profile-avatar bg-white text-primary rounded-circle d-flex align-items-center justify-content-center">
                                 <FaUser size={16} />
                             </div>
-                            <span className="d-none d-md-inline">Admin</span>
+                            <span className="d-none d-md-inline">{userProfile?.fullName || userProfile?.username || 'User'}</span>
                         </Dropdown.Toggle>
 
                         <Dropdown.Menu className="profile-dropdown">
                             <Dropdown.Header>
-                                <div className="fw-bold">Admin User</div>
-                                <small className="text-muted">admin@rxflow.com</small>
+                                <div className="fw-bold">{userProfile?.fullName || 'User'}</div>
+                                <small className="text-muted">{userProfile?.username || ''}</small>
                             </Dropdown.Header>
                             <Dropdown.Divider />
-                            <Dropdown.Item>
+                            <Dropdown.Item onClick={() => navigate('/profile')}>
                                 <FaUser className="me-2" /> Profile Settings
                             </Dropdown.Item>
                             <Dropdown.Divider />

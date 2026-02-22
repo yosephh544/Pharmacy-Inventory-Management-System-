@@ -34,4 +34,11 @@ namespace IntegratedImplementation.DTOs.User
         public bool? IsActive { get; set; }
         public List<int>? RoleIds { get; set; }
     }
+
+    public class ChangePasswordRequestDto
+    {
+        public string OldPassword { get; set; } = null!;
+        public string NewPassword { get; set; } = null!;
+        public string ConfirmPassword { get; set; } = null!;
+    }
 }

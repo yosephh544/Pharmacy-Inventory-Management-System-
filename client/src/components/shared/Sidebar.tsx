@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { FaHome, FaBox, FaCapsules, FaShoppingCart, FaTruck, FaFileAlt, FaChevronDown, FaChevronRight, FaUserCog } from 'react-icons/fa';
+import { authService } from '../../services/authService';
 
 const Sidebar = () => {
     const [reportsExpanded, setReportsExpanded] = useState(false);
-
-    // TODO: Replace with actual user role from authentication context
-    const userRole = 'admin'; // Hardcoded for now - will be replaced with actual auth
-    const isAdmin = userRole === 'admin';
+    const isAdmin = authService.hasRole('Admin') || authService.hasRole('SuperAdmin');
 
     const toggleReports = () => {
         setReportsExpanded(!reportsExpanded);

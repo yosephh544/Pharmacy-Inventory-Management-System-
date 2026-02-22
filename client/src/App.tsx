@@ -6,6 +6,7 @@ import Medicines from './pages/Medicines';
 import Sales from './pages/Sales';
 import Purchases from './pages/Purchases';
 import SystemUsers from './pages/SystemUsers';
+import Profile from './pages/Profile';
 import CurrentStock from './pages/reports/CurrentStock';
 import SalesReport from './pages/reports/SalesReport';
 import ExpiryReport from './pages/reports/ExpiryReport';
@@ -39,6 +40,7 @@ function App() {
             <Route path="/sales" element={<Sales />} />
             <Route path="/purchases" element={<Purchases />} />
             <Route path="/system-users" element={<SystemUsers />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/reports/current-stock" element={<CurrentStock />} />
             <Route path="/reports/sales" element={<SalesReport />} />
             <Route path="/reports/expiry" element={<ExpiryReport />} />

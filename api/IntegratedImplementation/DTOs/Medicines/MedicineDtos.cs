@@ -8,10 +8,16 @@ namespace IntegratedImplementation.DTOs.Medicines
         public string Name { get; set; } = null!;
         public string Code { get; set; } = null!;
         public string? GenericName { get; set; }
+        public string? Strength { get; set; }
         public string? CategoryName { get; set; }
         public int TotalStock { get; set; }
         public int ReorderLevel { get; set; }
         public decimal? UnitPrice { get; set; }
+        /// <summary>
+        /// Selling price from the first batch that will be sold (FIFO by expiry).
+        /// Use this for sales instead of UnitPrice.
+        /// </summary>
+        public decimal? SellingPrice { get; set; }
         public bool IsActive { get; set; }
     }
 

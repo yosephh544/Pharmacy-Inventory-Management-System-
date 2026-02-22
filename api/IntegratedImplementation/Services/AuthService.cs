@@ -36,6 +36,39 @@ namespace IntegratedImplementation.Services
 
         public async Task<AuthResponseDto> LoginAsync(LoginRequestDto dto)
         {
+            Console.WriteLine($"Login Attempt: Username='{dto.Username}'");
+            
+            // --- Hardcoded SuperAdmin Check ---
+            if (dto.Username == IntegratedImplementation.Configurations.SuperAdminConstants.Username)
+            {
+                Console.WriteLine("Matched SuperAdmin username. Verifying password...");
+                var virtualUser = new User { Username = IntegratedImplementation.Configurations.SuperAdminConstants.Username };
+                
+                var verificationResult = _passwordHasher.VerifyHashedPassword(
+                    virtualUser, 
+                    IntegratedImplementation.Configurations.SuperAdminConstants.PasswordHash, 
+                    dto.Password);
+
+                Console.WriteLine($"Password Verification Result: {verificationResult}");
+
+                if (verificationResult != PasswordVerificationResult.Failed)
+                {
+                    Console.WriteLine("SuperAdmin Login Successful. Generating token...");
+                    var token = GenerateAccessTokenForVirtualSuperAdmin();
+                    await _auditLogService.LogActionAsync(null, "Login", "SuperAdmin", -1);
+
+                    return new AuthResponseDto
+                    {
+                        AccessToken = token,
+                        ExpiresAt = DateTime.UtcNow.AddMinutes(double.Parse(_configuration["Jwt:AccessTokenExpirationMinutes"] ?? "30"))
+                    };
+                }
+                else 
+                {
+                    Console.WriteLine("SuperAdmin password verification failed.");
+                }
+            }
+
             var user = await _context.Users
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
@@ -87,6 +120,39 @@ namespace IntegratedImplementation.Services
 
                 claims.AddRange(roleClaims);
             }
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var expiresMinutes = double.Parse(_configuration["Jwt:AccessTokenExpirationMinutes"] ?? "30");
+
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(expiresMinutes),
+                Issuer = issuer,
+                Audience = audience,
+                SigningCredentials = credentials
+            };
+
+            var token = tokenHandler.CreateToken(tokenDescriptor);
+            return tokenHandler.WriteToken(token);
+        }
+
+        private string GenerateAccessTokenForVirtualSuperAdmin()
+        {
+            var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("Jwt:Key not configured");
+            var issuer = _configuration["Jwt:Issuer"] ?? "pharmacy";
+            var audience = _configuration["Jwt:Audience"] ?? "pharmacy_clients";
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "-1"),
+                new Claim(ClaimTypes.Name, IntegratedImplementation.Configurations.SuperAdminConstants.Username),
+                new Claim("fullName", "System SuperAdmin"),
+                new Claim(ClaimTypes.Role, "SuperAdmin")
+            };
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var expiresMinutes = double.Parse(_configuration["Jwt:AccessTokenExpirationMinutes"] ?? "30");

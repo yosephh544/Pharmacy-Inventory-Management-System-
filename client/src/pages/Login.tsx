@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Container, Form, Button, Card, Spinner } from 'react-bootstrap';
-import { FaPills } from 'react-icons/fa';
+import { Container, Form, Button, Card, Spinner, InputGroup } from 'react-bootstrap';
+import { FaPills, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -16,6 +16,7 @@ const Login = () => {
   });
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Aggressively clear fields on mount to bypass browser autofill
   useEffect(() => {
@@ -70,13 +71,23 @@ const Login = () => {
 
             <Form.Group className="mb-3" controlId="formBasicPassword">
               <Form.Label className="fw-bold small">Password</Form.Label>
-              <Form.Control
-                type="password"
-                autoComplete="new-password"
-                placeholder=""
-                className={`bg-lighter ${errors.password ? 'is-invalid' : ''}`}
-                {...register("password", { required: "Password is required" })}
-              />
+              <InputGroup>
+                <Form.Control
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  placeholder=""
+                  className={`bg-lighter ${errors.password ? 'is-invalid' : ''}`}
+                  {...register("password", { required: "Password is required" })}
+                />
+                <Button
+                  variant="outline-secondary"
+                  className="bg-lighter border-start-0 border"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <FaEyeSlash /> : <FaEye />}
+                </Button>
+              </InputGroup>
               {errors.password && <span className="text-danger small">{errors.password.message}</span>}
             </Form.Group>
 

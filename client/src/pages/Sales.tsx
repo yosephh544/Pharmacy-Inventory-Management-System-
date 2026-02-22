@@ -24,6 +24,7 @@ interface Medicine {
     categoryName?: string;
     totalStock: number;
     unitPrice?: number;
+    sellingPrice?: number;
     isActive: boolean;
 }
 
@@ -83,12 +84,18 @@ const Sales = () => {
         setError(null);
         try {
             const [salesRes, medicinesRes] = await Promise.all([
-                api.get<{ items: Sale[]; totalCount: number; page: number; pageSize: number }>('/sales'),
+                api.get<{ items: Sale[]; totalCount: number; page: number; pageSize: number }>('/sales/GetSales'),
                 api.get<Medicine[]>('/medicines/GetMedicines'),
             ]);
             setSales(salesRes.data.items);
-            setMedicines(medicinesRes.data.filter(m => m.isActive && m.totalStock > 0));
+            // Keep all active medicines; we'll show stock info in the dropdown
+            const activeMeds = medicinesRes.data.filter(m => m.isActive);
+            setMedicines(activeMeds);
+            if (activeMeds.length === 0) {
+                console.warn('No active medicines found. Check if medicines exist and are marked as active.');
+            }
         } catch (err: any) {
+            console.error('Failed to load data:', err);
             const message =
                 err?.response?.data?.message ||
                 err?.message ||
@@ -182,7 +189,7 @@ const Sales = () => {
     const calculateTotal = () => {
         return saleItems.reduce((total, item) => {
             const medicine = medicines.find(m => m.id === item.medicineId);
-            const price = medicine?.unitPrice || 0;
+            const price = medicine?.sellingPrice || 0;
             return total + price * item.quantity;
         }, 0);
     };
@@ -198,7 +205,7 @@ const Sales = () => {
         setActionMessage(null);
 
         try {
-            await api.post('/sales', {
+            await api.post('/sales/CreateSale', {
                 items: saleItems,
                 paymentMethod: paymentMethod || 'Cash',
             });
@@ -479,11 +486,21 @@ const Sales = () => {
                                 }}
                             >
                                 <option value={0}>-- Select Medicine --</option>
-                                {medicines.map(med => (
-                                    <option key={med.id} value={med.id}>
-                                        {med.name} ({med.code}) - Stock: {med.totalStock} - Price: {med.unitPrice?.toFixed(2) || 'N/A'} ETB
-                                    </option>
-                                ))}
+                                {medicines.length === 0 ? (
+                                    <option disabled>No medicines available</option>
+                                ) : (
+                                    medicines.map(med => (
+                                        <option
+                                            key={med.id}
+                                            value={med.id}
+                                            disabled={med.totalStock <= 0 || !med.sellingPrice}
+                                        >
+                                            {med.name} ({med.code}) - Stock: {med.totalStock} - Price: {med.sellingPrice?.toFixed(2) || 'N/A'} ETB
+                                            {med.totalStock <= 0 ? ' [OUT OF STOCK]' : ''}
+                                            {med.totalStock > 0 && !med.sellingPrice ? ' [NO PRICE]' : ''}
+                                        </option>
+                                    ))
+                                )}
                             </Form.Select>
                         </Col>
                         <Col md={3}>
@@ -519,7 +536,7 @@ const Sales = () => {
                                 <tbody>
                                     {saleItems.map((item, index) => {
                                         const medicine = medicines.find(m => m.id === item.medicineId);
-                                        const price = medicine?.unitPrice || 0;
+                                        const price = medicine?.sellingPrice || 0;
                                         return (
                                             <tr key={index}>
                                                 <td>{medicine?.name || 'Unknown'}</td>

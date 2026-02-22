@@ -22,6 +22,7 @@ interface MedicineListItem {
     name: string;
     code: string;
     genericName?: string;
+    strength?: string;
     categoryName?: string;
     totalStock: number;
     reorderLevel: number;
@@ -83,7 +84,6 @@ const Medicines = () => {
     const [medReorderLevel, setMedReorderLevel] = useState<number | ''>(0);
     const [medRequiresRx, setMedRequiresRx] = useState(false);
     const [medCategoryId, setMedCategoryId] = useState<number>(0);
-    const [medUnitPrice, setMedUnitPrice] = useState<number | ''>('');
     const [medSubmitAttempted, setMedSubmitAttempted] = useState(false);
 
     // Category create
@@ -147,7 +147,6 @@ const Medicines = () => {
         setMedReorderLevel(0);
         setMedRequiresRx(false);
         setMedCategoryId(categories.length > 0 ? categories[0].id : 0);
-        setMedUnitPrice('');
         setMedSubmitAttempted(false);
         setShowMedicineModal(true);
     };
@@ -166,7 +165,6 @@ const Medicines = () => {
             setMedReorderLevel(med.reorderLevel);
             setMedRequiresRx(med.requiresPrescription);
             setMedCategoryId(med.categoryId);
-            setMedUnitPrice(med.unitPrice ?? '');
             setMedSubmitAttempted(false);
             setShowMedicineModal(true);
         } catch (err: any) {
@@ -201,7 +199,6 @@ const Medicines = () => {
             reorderLevel: Number(medReorderLevel) || 0,
             requiresPrescription: medRequiresRx,
             categoryId: medCategoryId,
-            unitPrice: medUnitPrice === '' ? null : Number(medUnitPrice),
         };
 
         try {
@@ -215,7 +212,6 @@ const Medicines = () => {
                     reorderLevel: payload.reorderLevel,
                     requiresPrescription: payload.requiresPrescription,
                     categoryId: payload.categoryId,
-                    unitPrice: payload.unitPrice,
                 };
                 await api.put(`/medicines/UpdateMedicine/${editingMedicine.id}`, updatePayload);
                 setActionMessage(`Medicine "${payload.name}" was updated successfully.`);
@@ -612,7 +608,7 @@ const Medicines = () => {
                                     <th>Medicine</th>
                                     <th>Category</th>
                                     <th>Stock</th>
-                                    <th>Price</th>
+                                    <th>Strength</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -638,7 +634,7 @@ const Medicines = () => {
                                                 </td>
                                                 <td>{med.categoryName ?? '-'}</td>
                                                 <td>{med.totalStock}</td>
-                                                <td>{med.unitPrice ? `${med.unitPrice.toFixed(2)} ETB` : '-'}</td>
+                                                <td>{med.strength || '-'}</td>
                                                 <td>
                                                     {isLowStock ? (
                                                         <Badge bg="warning">Low Stock</Badge>
@@ -782,16 +778,6 @@ const Medicines = () => {
                             <Form.Control.Feedback type="invalid">
                                 Please select a category.
                             </Form.Control.Feedback>
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Unit Price</Form.Label>
-                            <Form.Control
-                                type="number"
-                                value={medUnitPrice}
-                                onChange={e => setMedUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                                min={0}
-                                step="0.01"
-                            />
                         </Form.Group>
                     </Form>
                 </Modal.Body>

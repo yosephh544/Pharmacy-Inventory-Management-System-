@@ -9,5 +9,6 @@ namespace IntegratedImplementation.Interfaces
         Task<UserResponseDto> CreateUserAsync(CreateUserRequestDto dto);
         Task<UserResponseDto> UpdateUserAsync(int id, UpdateUserRequestDto dto);
         Task<bool> DeactivateUserAsync(int id);
+        Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequestDto dto);
     }
 }

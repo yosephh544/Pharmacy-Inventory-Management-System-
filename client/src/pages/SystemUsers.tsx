@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Container, Card, Row, Col, Button, Table, Badge, Spinner, Alert, Modal, Form } from 'react-bootstrap';
-import { FaUserPlus, FaUserShield } from 'react-icons/fa';
+import { FaUserPlus, FaUserShield, FaEdit } from 'react-icons/fa';
 import api from '../services/api';
 
 interface SystemUser {
@@ -37,6 +37,12 @@ const SystemUsers = () => {
     const [newRoleIds, setNewRoleIds] = useState<number[]>([]);
     const [newPharmacyProfileId, setNewPharmacyProfileId] = useState<number>(0);
     const [submitAttempted, setSubmitAttempted] = useState(false);
+
+    // Edit User State
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [selectedUser, setSelectedUser] = useState<SystemUser | null>(null);
+    const [editRoleIds, setEditRoleIds] = useState<number[]>([]);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const loadData = async () => {
         setLoading(true);
@@ -78,10 +84,16 @@ const SystemUsers = () => {
         setShowCreateModal(true);
     };
 
-    const handleToggleRoleSelection = (roleId: number) => {
-        setNewRoleIds(prev =>
-            prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
-        );
+    const handleToggleRoleSelection = (roleId: number, isEdit: boolean = false) => {
+        if (isEdit) {
+            setEditRoleIds(prev =>
+                prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+            );
+        } else {
+            setNewRoleIds(prev =>
+                prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+            );
+        }
     };
 
     const handleCreateUser = async () => {
@@ -145,6 +157,35 @@ const SystemUsers = () => {
                 err?.message ||
                 (user.isActive ? 'Failed to deactivate user.' : 'Failed to reactivate user.');
             setError(message);
+        }
+    };
+
+    const handleOpenEditModal = (user: SystemUser) => {
+        setSelectedUser(user);
+        // Map user's role names back to role IDs
+        const userRoleIds = roles
+            .filter(r => user.roles.includes(r.name))
+            .map(r => r.id);
+        setEditRoleIds(userRoleIds);
+        setShowEditModal(true);
+    };
+
+    const handleUpdateUser = async () => {
+        if (!selectedUser) return;
+
+        setIsUpdating(true);
+        setError(null);
+        try {
+            await api.put(`/users/UpdateUser/${selectedUser.id}`, {
+                roleIds: editRoleIds
+            });
+            setShowEditModal(false);
+            setActionMessage(`User "${selectedUser.username}" roles updated successfully.`);
+            await loadData();
+        } catch (err: any) {
+            setError(err?.response?.data?.message || err?.message || 'Failed to update user roles.');
+        } finally {
+            setIsUpdating(false);
         }
     };
 
@@ -239,13 +280,22 @@ const SystemUsers = () => {
                                                 </Badge>
                                             </td>
                                             <td>
-                                                <Button
-                                                    variant={user.isActive ? 'outline-danger' : 'outline-success'}
-                                                    size="sm"
-                                                    onClick={() => handleToggleUserStatus(user)}
-                                                >
-                                                    {user.isActive ? 'Disable' : 'Enable'}
-                                                </Button>
+                                                <div className="d-flex gap-2">
+                                                    <Button
+                                                        variant="outline-primary"
+                                                        size="sm"
+                                                        onClick={() => handleOpenEditModal(user)}
+                                                    >
+                                                        <FaEdit /> Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant={user.isActive ? 'outline-danger' : 'outline-success'}
+                                                        size="sm"
+                                                        onClick={() => handleToggleUserStatus(user)}
+                                                    >
+                                                        {user.isActive ? 'Disable' : 'Enable'}
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -408,6 +458,45 @@ const SystemUsers = () => {
                         onClick={handleCreateUser}
                     >
                         Create User
+                    </Button>
+                </Modal.Footer>
+            </Modal>
+
+            {/* Edit User Modal */}
+            <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
+                <Modal.Header closeButton>
+                    <Modal.Title>Edit User Roles: {selectedUser?.username}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <Form>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Full Name</Form.Label>
+                            <Form.Control type="text" value={selectedUser?.fullName || ''} disabled />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Assign Roles</Form.Label>
+                            <div>
+                                {roles.map(role => (
+                                    <Form.Check
+                                        key={role.id}
+                                        inline
+                                        type="checkbox"
+                                        id={`edit-user-role-${role.id}`}
+                                        label={role.name}
+                                        checked={editRoleIds.includes(role.id)}
+                                        onChange={() => handleToggleRoleSelection(role.id, true)}
+                                    />
+                                ))}
+                            </div>
+                        </Form.Group>
+                    </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+                        Cancel
+                    </Button>
+                    <Button variant="primary" onClick={handleUpdateUser} disabled={isUpdating}>
+                        {isUpdating ? <Spinner animation="border" size="sm" /> : 'Save Changes'}
                     </Button>
                 </Modal.Footer>
             </Modal>

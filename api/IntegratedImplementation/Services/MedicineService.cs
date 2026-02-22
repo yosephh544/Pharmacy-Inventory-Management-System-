@@ -24,22 +24,39 @@ namespace IntegratedImplementation.Services
 
         public async Task<IEnumerable<MedicineListItemDto>> GetAllMedicinesAsync()
         {
-            return await _context.Medicines
+            var today = DateTime.UtcNow.Date;
+
+            var medicines = await _context.Medicines
                 .Include(m => m.Category)
                 .Include(m => m.Batches)
-                .Select(m => new MedicineListItemDto
+                .ToListAsync();
+
+            return medicines.Select(m =>
+            {
+                // Get active, non-expired batches with stock, sorted by FIFO (earliest expiry first)
+                var availableBatches = m.Batches
+                    .Where(b => b.IsActive && b.Quantity > 0 && b.ExpiryDate >= today)
+                    .OrderBy(b => b.ExpiryDate)
+                    .ToList();
+
+                // First batch price (FIFO) - this is what will be used when selling
+                var firstBatch = availableBatches.FirstOrDefault();
+
+                return new MedicineListItemDto
                 {
                     Id = m.Id,
                     Name = m.Name,
                     Code = m.Code,
                     GenericName = m.GenericName,
-                    CategoryName = m.Category.Name,
-                    TotalStock = m.Batches.Sum(b => b.Quantity),
+                    Strength = m.Strength,
+                    CategoryName = m.Category?.Name,
+                    TotalStock = availableBatches.Sum(b => b.Quantity),
                     ReorderLevel = m.ReorderLevel,
                     UnitPrice = m.UnitPrice,
+                    SellingPrice = firstBatch?.SellingPrice,
                     IsActive = m.IsActive
-                })
-                .ToListAsync();
+                };
+            }).ToList();
         }
 
         public async Task<MedicineResponseDto> GetMedicineByIdAsync(int id)

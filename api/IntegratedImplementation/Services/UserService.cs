@@ -269,5 +269,28 @@ namespace IntegratedImplementation.Services
 
             return true;
         }
+
+        public async Task<bool> ChangePasswordAsync(int userId, ChangePasswordRequestDto dto)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                throw new KeyNotFoundException($"User with ID {userId} not found");
+
+            if (dto.NewPassword != dto.ConfirmPassword)
+                throw new InvalidOperationException("New password and confirmation password do not match");
+
+            // Verify old password
+            var passwordResult = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, dto.OldPassword);
+            if (passwordResult == PasswordVerificationResult.Failed)
+                throw new InvalidOperationException("Invalid old password");
+
+            // Hash and save new password
+            user.PasswordHash = _passwordHasher.HashPassword(user, dto.NewPassword);
+            await _context.SaveChangesAsync();
+
+            await _auditLogService.LogActionAsync(userId, "ChangePassword", "User", userId);
+            
+            return true;
+        }
     }
 }
